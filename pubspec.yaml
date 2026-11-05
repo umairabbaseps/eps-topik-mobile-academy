@@ -1,0 +1,29 @@
+name: eps_topik_pro_pakistan
+description: "EPS TOPIK Pro Pakistan — Korea Pakka! Free basic-to-test-ready EPS-TOPIK app for Pakistani students."
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+  shared_preferences: ^2.3.2
+  flutter_tts: ^4.2.0
+  speech_to_text: ^7.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/logo.png
+    - assets/logo-1024.png
+  fonts:
+    - family: NotoNastaliq
+      fonts:
+        - asset: assets/fonts/NotoNastaliqUrdu.ttf
