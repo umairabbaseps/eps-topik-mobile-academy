@@ -1,4 +1,6 @@
-# EPS TOPIK Pakistan - Lets go Korea
+# EPS TOPIK Pro Pakistan
+
+Korea Pakka!
 
 Learn Korean for Korea Jobs. Free basic-to-test-ready EPS-TOPIK app for Pakistani students.
 
@@ -7,8 +9,9 @@ Focus: Pakistan only for now. Other EPS sending countries may be added later.
 ## Ownership
 
 - Owner: umairabbaseps (GitHub account in the owners name)
-- App name: EPS TOPIK Pakistan - Lets go Korea
-- Store title: EPS TOPIK Pakistan - Lets go Korea
+- App name: EPS TOPIK Pro Pakistan
+- Tagline: Korea Pakka!
+- Store title: EPS TOPIK Pro Pakistan
 - Database: own PostgreSQL (Supabase self-hosted on own VPS when paid). Not Firebase.
 - Launch: Google Play Store first, iPhone / App Store later.
 - Start: FREE — test by direct APK / link first, pay $25 Play Store only when ready, move to paid Supabase / VPS when earning.
