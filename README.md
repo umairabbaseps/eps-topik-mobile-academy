@@ -1,26 +1,30 @@
-# EPS TOPIK Mobile Academy
+# EPS TOPIK Pakistan - Lets go Korea
 
-Learn Korean for Korea Jobs. Free basic-to-test-ready EPS-TOPIK app for Pakistani, Nepali, Bangladeshi and other EPS sending-country students.
+Learn Korean for Korea Jobs. Free basic-to-test-ready EPS-TOPIK app for Pakistani students.
+
+Focus: Pakistan only for now. Other EPS sending countries may be added later.
 
 ## Ownership
 
 - Owner: umairabbaseps (GitHub account in the owners name)
-- App name: EPS TOPIK Mobile Academy
-- Store title: EPS TOPIK Mobile Academy — Learn Korean for Korea Jobs
+- App name: EPS TOPIK Pakistan - Lets go Korea
+- Store title: EPS TOPIK Pakistan - Lets go Korea
 - Database: own PostgreSQL (Supabase self-hosted on own VPS when paid). Not Firebase.
 - Launch: Google Play Store first, iPhone / App Store later.
 - Start: FREE — test by direct APK / link first, pay $25 Play Store only when ready, move to paid Supabase / VPS when earning.
 
 ## What the app does
 
-- Onboarding: country selector (Pakistan, Nepal, Bangladesh, Sri Lanka, India, Uzbekistan, Kyrgyzstan, Tajikistan, Kazakhstan, Cambodia, Vietnam, Myanmar, Thailand, Philippines, Indonesia, Mongolia, China, Timor-Leste, Laos), each with its own interface language. Urdu for Pakistan, plus Punjabi voice. Korean lessons stay in Korean. English fallback.
+- Pakistan focus: explanation language choice — English, Roman Urdu, or Urdu written in Urdu script, changeable in settings. Punjabi voice tutor. Korean lessons stay in Korean.
 - OEC journey tracker: lucky draw, test, skill test, roster. Not affiliated with OEC or HRD Korea.
-- Test format (current general EPS-TOPIK): 40 questions, 20 reading + 20 listening, 50 minutes, 100 points, floor 60 manufacturing / 45 other industries, relative ranking.
+- Test format (current general EPS-TOPIK): 40 questions, 20 reading + 20 listening, 50 minutes, 100 points.
+- Pakistan 2026, user-reported: passing floor 60/100 for all sectors, merit 82.5/100. Merit changes each round — check the latest OEC notice at jobs.oec.gov.pk.
 - Round 2 Skill Test (compulsory): physical 30 + interview 30 + basic skills 40, below 60% means out, +5 Job Capacity, 205 combined, 2-year roster, no guaranteed job.
-- Course: 60 units following the new HRD Korea Standard Korean Textbook (2024 revised), Book 1 daily life + Book 2 workplace. Original lessons, do not copy the textbook or real test questions.
+- Course: follows the new HRD Korea Standard Korean Textbook (2024 revised edition), Book 1 daily life + Book 2 workplace, in force from 1 Aug 2025, content updated June 2026. Original lessons, do not copy the textbook or real test questions. Official books are free from HRD Korea.
+- Hangul first: vowels, consonants, syllable builder, notebook writing practice, speak test with honest feedback, level system, timer games, funny Urdu slogans.
 - Vocabulary, flashcards, grammar, listening, reading, sector tracks (manufacturing and agriculture from day one), timed mock simulator scored /100.
-- Punjabi voice tutor: ask in Punjabi / Urdu by mic or text, check transcript, hear Korean answer slowly then normal, auto-saved as flashcards.
+- Punjabi voice tutor: ask in Punjabi / Urdu by mic or text, check transcript, hear Korean answer, auto-saved as flashcards.
 
 ## Status
 
-Prototype v1 built in Muse (artifact eps-topik-app), under test. This repository is the owners source-of-truth for the real app: code, content and database schema will be saved here before Play Store launch, so the owner controls the app, not any developer.
+Prototype built in Muse (artifact eps-topik-app), under test. This repository is the owners source-of-truth for the real app: code, content and database schema will be saved here before Play Store launch, so the owner controls the app, not any developer.
