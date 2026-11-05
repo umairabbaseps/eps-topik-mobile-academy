@@ -40,10 +40,14 @@ class _EpsAppState extends State<EpsApp> {
       title: 'EPS TOPIK Pro Pakistan',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.indigo,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0B2C6B)),
+        primarySwatch: Colors.teal,
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0B2C6B), primary: const Color(0xFF0B2C6B), secondary: const Color(0xFF00897B), tertiary: const Color(0xFFFF7043)),
+        scaffoldBackgroundColor: const Color(0xFFF2F5FA),
         fontFamily: AppStore.I.lang == 'script' ? 'NotoNastaliq' : null,
         useMaterial3: true,
+        appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B2C6B), foregroundColor: Colors.white, centerTitle: false),
+        elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0B2C6B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+        cardTheme: const CardThemeData(elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16)))),
       ),
       home: const RootPage(),
     );
@@ -284,60 +288,121 @@ class _HomePageState extends State<HomePage> {
     final lang = AppStore.I.lang;
     final store = AppStore.I;
     final words = (store.progress['words'] as Map? ?? {}).length;
+    final days = (store.progress['days'] as List? ?? []).length;
+    final mocks = (store.progress['mocks'] as List? ?? []).length;
+    final navy = const Color(0xFF0B2C6B);
+    final teal = const Color(0xFF00897B);
     return ListView(padding: const EdgeInsets.all(16), children: [
+      // HERO — gradient, logo, progress
+      Container(
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [Color(0xFF0B2C6B), Color(0xFF1565C0), Color(0xFF00897B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        padding: const EdgeInsets.all(18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset('assets/logo.png', height: 72, width: 72, fit: BoxFit.cover)),
+            const SizedBox(width: 12),
+            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('EPS TOPIK Pro Pakistan', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.white)),
+              const Text('Korea Pakka! 🇰🇷🇵🇰', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFFFE082))),
+              Text('${store.currentName} • ${store.isGuest ? 'Guest — on this phone only' : 'Account saved'}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+            ])),
+          ]),
+          const SizedBox(height: 14),
+          ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: (store.level / 5).clamp(0.0, 1.0), minHeight: 10, backgroundColor: Colors.white30, valueColor: const AlwaysStoppedAnimation(Color(0xFFFFCA28)))),
+          const SizedBox(height: 6),
+          Text('Level ${store.level} of 5  •  $words words learned  •  $days study days  •  $mocks mock tests', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          SizedBox(width: double.infinity, child: ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF7043), minimumSize: const Size.fromHeight(54)),
+            onPressed: widget.onStart,
+            child: Text('▶  ${t(lang, 'startLearning')} — Lesson 1, Korean letters', style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
+          )),
+        ]),
+      ),
+      const SizedBox(height: 14),
+      // FREE + FRESH — two compact cards side by side
       Row(children: [
-        Image.asset('assets/logo.png', height: 64),
+        Expanded(child: _miniCard(Colors.green, '🎓 FREE', t(lang, 'freeTitle'), t(lang, 'notebookLine'))),
         const SizedBox(width: 10),
-        Expanded(child: Text('${store.currentName} • ${store.session ?? ''}\n${store.isGuest ? 'Guest mode — progress stays on this phone only' : 'Your progress is saved to your account — log in on any mobile.'}',
-            style: const TextStyle(fontSize: 12))),
+        Expanded(child: _miniCard(Colors.orange, '📖 Fresh syllabus', t(lang, 'fresh'), 'New HRD books, 2024 revised, in force 1 Aug 2025.')),
       ]),
-      const SizedBox(height: 10),
-      Card(
-        color: Colors.green.shade50,
-        child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(t(lang, 'freeTitle'), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          Text(t(lang, 'freeSub')),
-          const SizedBox(height: 6),
-          Text(t(lang, 'notebookLine'), style: const TextStyle(fontWeight: FontWeight.bold)),
-        ])),
+      const SizedBox(height: 6),
+      Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFFFCA28), width: 2)),
+        child: Row(children: [
+          const Text('🎯', style: TextStyle(fontSize: 30)),
+          const SizedBox(width: 10),
+          Expanded(child: Text(t(lang, 'passing'), style: const TextStyle(fontWeight: FontWeight.bold))),
+        ]),
       ),
-      Card(
-        color: Colors.orange.shade50,
-        child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(t(lang, 'fresh'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          Text(t(lang, 'freshBody')),
-          const SizedBox(height: 6),
-          Text(t(lang, 'passing'), style: const TextStyle(fontWeight: FontWeight.bold)),
-          const Text('2026 test held in Karachi and Islamabad only. Same test, same floor, same merit at both centres.'),
-        ])),
+      const SizedBox(height: 16),
+      _sectionHead('🚀', 'Your learning path', navy),
+      GridView.count(
+        shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.35,
+        children: [
+          _gridCard(teal, '🎤', t(lang, 'tutor'), 'Ask in Pashto, Sindhi, Saraiki, Punjabi, Urdu, English', () => widget.onGo(4, 'Tutor')),
+          _gridCard(navy, '📚', t(lang, 'course'), 'Hangul + Units 1–60, new syllabus', () => widget.onGo(1, 'Learn')),
+          _gridCard(const Color(0xFF6A1B9A), '🎮', t(lang, 'games'), 'Listen & Tap, Match, Memory, Quiz', () => widget.onGo(5, 'Games')),
+          _gridCard(const Color(0xFFEF6C00), '🎙️', t(lang, 'speakTest'), 'Listen, repeat, speak — honest score', () => widget.onGo(2, 'Practice')),
+        ],
       ),
-      ElevatedButton(
-        style: ElevatedButton.styleFrom(backgroundColor: Colors.red, minimumSize: const Size.fromHeight(56)),
-        onPressed: widget.onStart,
-        child: Text('▶ ${t(lang, 'startLearning')} — Lesson 1, Korean letters: listen and learn',
-            style: const TextStyle(fontSize: 16, color: Colors.white)),
-      ),
-      const SizedBox(height: 8),
-      Text('Level ${store.level} of 5 • $words words learned • ${(store.progress['days'] as List? ?? []).length} study days',
-          style: const TextStyle(fontWeight: FontWeight.bold)),
-      const SizedBox(height: 8),
-      _homeTile(context, '🎤 ${t(lang, 'tutor')}', t(lang, 'askLang'), () => widget.onGo(4, 'Tutor')),
-      _homeTile(context, '📚 ${t(lang, 'course')}', 'Preliminary Hangul, Units 1–30 daily life, Units 31–60 workplace. Official HRD books are free — link in Learn.', () => widget.onGo(1, 'Learn')),
-      _homeTile(context, '🎮 ${t(lang, 'games')}', 'Listen and Tap, Word Match, Memory Cards, Syllable Builder, Speed Quiz, Daily Challenge.', () => widget.onGo(5, 'Games')),
-      _homeTile(context, '🛡 ${t(lang, 'skillTest')}', 'Physical 30 + interview 30 + basic skills 40. Below 60% means out. +5 Job Capacity, 205 combined.', () => widget.onGo(1, 'Learn')),
+      const SizedBox(height: 16),
+      _sectionHead('🏆', 'Test-ready', const Color(0xFFC62828)),
+      _homeTile(context, '📝 Mock Test — Basic & Expert', '40 questions, 50 min, 100 points. Expert = real test level, merit 82.5.', () => widget.onGo(3, 'Mock')),
+      _homeTile(context, '🛡 ${t(lang, 'skillTest')}', 'Physical 30 + interview 30 + skills 40. Below 60% means out. Total 205.', () => widget.onGo(1, 'Learn')),
       _homeTile(context, '🆘 ${t(lang, 'emergency')}', 'I am hurt • Please help me • Where is the toilet? — with sound.', () => widget.onGo(1, 'Learn')),
-      _homeTile(context, '🏭 ${t(lang, 'lifeWork')}', 'Minimum wage 2026: 10,320 KRW/hour. Overtime, rest day, 1350 helpline, 119 emergency. Do not pay any agent.', () => widget.onGo(1, 'Learn')),
-      _homeTile(context, '📋 ${t(lang, 'docs')}', 'Passport, CNIC, medical, police character, OEC forms, roster — tick each off with a date.', () => widget.onGo(1, 'Learn')),
-      const SizedBox(height: 8),
-      const Text('12-week self-study plan — 30 minutes a day', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ...selfStudyPlan.map((w) => ListTile(leading: const Icon(Icons.check_circle_outline), title: Text(w[0]), subtitle: Text(w[1]))),
+      const SizedBox(height: 16),
+      _sectionHead('🌏', 'Life in Korea', teal),
+      _homeTile(context, '🏭 ${t(lang, 'lifeWork')}', 'Minimum wage 2026: 10,320 KRW/hour. Rights, safety, helpline 1350, 119.', () => widget.onGo(1, 'Learn')),
+      _homeTile(context, '📋 ${t(lang, 'docs')}', 'Passport, CNIC, medical, police character, OEC forms — tick each off.', () => widget.onGo(1, 'Learn')),
+      const SizedBox(height: 16),
+      _sectionHead('📅', '12-week self-study plan — 30 min a day', navy),
+      Card(child: ExpansionTile(
+        title: const Text('Weeks 1–12 — tap to open the plan', style: TextStyle(fontWeight: FontWeight.bold)),
+        children: selfStudyPlan.map((w) => ListTile(leading: const Icon(Icons.check_circle_outline, color: Color(0xFF00897B)), title: Text(w[0], style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(w[1]))).toList(),
+      )),
+      const SizedBox(height: 10),
+      const Text('Not affiliated with OEC or HRD Korea. Check the latest OEC notice at jobs.oec.gov.pk.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey)),
     ]);
   }
 
+  Widget _sectionHead(String emoji, String title, Color c) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Row(children: [Text(emoji, style: const TextStyle(fontSize: 20)), const SizedBox(width: 6), Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c))]),
+  );
+
+  Widget _miniCard(Color c, String title, String line1, String line2) => Container(
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16), border: Border.all(color: c.withValues(alpha: 0.35))),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 15)),
+      const SizedBox(height: 4),
+      Text(line1, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+      Text(line2, style: const TextStyle(fontSize: 12)),
+    ]),
+  );
+
+  Widget _gridCard(Color c, String emoji, String title, String sub, VoidCallback onTap) => InkWell(
+    onTap: onTap,
+    borderRadius: BorderRadius.circular(16),
+    child: Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border(left: BorderSide(color: c, width: 5))),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(emoji, style: const TextStyle(fontSize: 26)),
+        const SizedBox(height: 4),
+        Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 14)),
+        Text(sub, style: const TextStyle(fontSize: 12)),
+      ]),
+    ),
+  );
+
   Widget _homeTile(BuildContext context, String title, String sub, VoidCallback onTap) {
-    return Card(child: ListTile(title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(sub), trailing: const Icon(Icons.arrow_forward), onTap: onTap));
+    return Card(child: ListTile(title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(sub), trailing: const Icon(Icons.arrow_forward_ios, size: 16), onTap: onTap));
   }
 }
 
@@ -352,6 +417,9 @@ class _LearnPageState extends State<LearnPage> {
   String section = 'hangul';
   int vowelIdx = 0, consIdx = 0, buildIdx = 0, buildStage = 0;
   int notebookStep = 0;
+  int vocabPage = 0;
+  int? selectedUnit;
+  int? selectedSkill;
 
   @override
   Widget build(BuildContext context) {
@@ -422,36 +490,120 @@ class _LearnPageState extends State<LearnPage> {
   }
 
   Widget _vocab() {
-    return Column(children: vocab.map((w) => Card(child: ListTile(
-      title: Text('${w[0]}  •  ${w[1]}', style: const TextStyle(fontSize: 18)),
-      subtitle: Text('${w[2]} — ${w[3]}'),
-      trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-        IconButton(icon: const Icon(Icons.volume_up), onPressed: () => speakSlowThenNormal(w[0])),
-        IconButton(icon: Icon(AppStore.I.progress['words']?[w[0]] == 'mastered' ? Icons.star : Icons.star_border),
-            onPressed: () async { await AppStore.I.setWord(w[0], 'mastered'); setState(() {}); }),
+    const pageSize = 20;
+    final pages = (vocab.length / pageSize).ceil();
+    final page = vocabPage.clamp(0, pages - 1);
+    final items = vocab.sublist(page * pageSize, ((page + 1) * pageSize).clamp(0, vocab.length));
+    return Column(children: [
+      Text('Vocabulary — ${vocab.length} words, page ${page + 1} of $pages', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      const Text('Tap 🔊 to hear a word, tap ⭐ when you know it. Words are in order — finish one page, then go to the next.'),
+      const SizedBox(height: 8),
+      ...items.map((w) => Card(child: ListTile(
+        title: Text('${w[0]}  •  ${w[1]}', style: const TextStyle(fontSize: 18)),
+        subtitle: Text('${w[2]} — ${w[3]}'),
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          IconButton(icon: const Icon(Icons.volume_up), onPressed: () => speakSlowThenNormal(w[0])),
+          IconButton(icon: Icon(AppStore.I.progress['words']?[w[0]] == 'mastered' ? Icons.star : Icons.star_border),
+              onPressed: () async { await AppStore.I.setWord(w[0], 'mastered'); setState(() {}); }),
+        ]),
+      ))),
+      const SizedBox(height: 8),
+      Wrap(spacing: 6, alignment: WrapAlignment.center, children: [
+        ElevatedButton(onPressed: page > 0 ? () => setState(() => vocabPage = page - 1) : null, child: const Text('← Prev')),
+        for (int i = 0; i < pages; i++)
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 1), child: ChoiceChip(label: Text('${i + 1}'), selected: i == page, onSelected: (_) => setState(() => vocabPage = i))),
+        ElevatedButton(onPressed: page < pages - 1 ? () => setState(() => vocabPage = page + 1) : null, child: const Text('Next →')),
       ]),
-    ))).toList());
+    ]);
   }
 
   Widget _course() {
+    if (selectedUnit != null) {
+      final u = units.firstWhere((e) => e.n == selectedUnit);
+      final keyWords = vocab.sublist((u.n * 5) % vocab.length, ((u.n * 5) % vocab.length + 5).clamp(0, vocab.length));
+      final bookLabel = u.book == 'P' ? 'Book 1 Preliminary — Hangul' : (u.book == '1' ? 'Book 1 — Daily life' : 'Book 2 — Workplace');
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          TextButton.icon(icon: const Icon(Icons.arrow_back), label: const Text('All units'), onPressed: () => setState(() => selectedUnit = null)),
+          const Spacer(),
+          TextButton(onPressed: () async { await AppStore.I.setDone('unit_${u.n}', true); setState(() {}); }, child: const Text('✓ Mark done')),
+        ]),
+        Text('Unit ${u.n} — ${u.en}', style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+        Text(u.ko, style: const TextStyle(fontSize: 18)),
+        Text(bookLabel, style: const TextStyle(fontWeight: FontWeight.bold, color: Color(0xFF00897B))),
+        const SizedBox(height: 10),
+        _lessonBox('🎯 What you will learn', 'In this unit you learn about ${u.en.toLowerCase()}. Read the Korean title, learn the grammar below, learn the 5 key words, say each one aloud, then write them in your notebook.'),
+        _lessonBox('📖 Grammar', '${u.grammar} — use it in a short sentence. Example: say the Korean word, then make a sentence with it. Your teacher in the app: tap 🔊 on every word to hear it slow, then normal.'),
+        _lessonBox('🗣️ Example sentences', u.n == 0
+            ? '안녕하세요. — Hello.\n제 이름은 …입니다. — My name is …\n저는 파키스탄 사람이에요. — I am from Pakistan.'
+            : u.book == '1'
+                ? '이것은 ${u.ko}입니다. — This is about ${u.en.toLowerCase()}.\n${u.ko}에 대해 이야기해요. — Let us talk about ${u.en.toLowerCase()}.'
+                : '직장에서 ${u.ko}이/가 중요해요. — At work, ${u.en.toLowerCase()} is important.\n안전하게 일하세요. — Work safely.'),
+        _lessonBox('🔑 5 key words in this unit', ''),
+        ...keyWords.map((w) => Card(child: ListTile(title: Text('${w[0]} • ${w[1]}', style: const TextStyle(fontSize: 17)), subtitle: Text('${w[2]} — ${w[3]}'), trailing: IconButton(icon: const Icon(Icons.volume_up), onPressed: () => speakSlowThenNormal(w[0]))))),
+        const SizedBox(height: 8),
+        const Text('✏️ Notebook task: write the 5 words above 5 times each, then write one sentence of your own. Tap “I wrote it” in Notebook Time when you finish.', style: TextStyle(fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        ElevatedButton(onPressed: () => speakSlowThenNormal(u.ko), child: const Text('🔊 Hear the unit title in Korean')),
+      ]);
+    }
     return Column(children: [
       const Text('New syllabus — HRD Korea Standard Korean Textbook (2024 revised edition), in force from 1 Aug 2025. Official books are free from HRD Korea: hrdkorea.or.kr / epstopik.hrdkorea.or.kr', style: TextStyle(fontSize: 14)),
       const SizedBox(height: 8),
-      ...units.map((u) => Card(child: CheckboxListTile(
+      const Text('Tap any unit to open its lesson — what to learn, grammar, key words, example sentences and a notebook task.', style: TextStyle(fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8),
+      ...units.map((u) => Card(child: ListTile(
+        leading: CircleAvatar(backgroundColor: const Color(0xFF0B2C6B), child: Text('${u.n}', style: const TextStyle(color: Colors.white))),
         title: Text('Unit ${u.n} — ${u.en}'),
         subtitle: Text('${u.ko}\nGrammar: ${u.grammar} • Book ${u.book == 'P' ? '1 Preliminary' : u.book}'),
-        value: AppStore.I.isDone('unit_${u.n}'),
-        onChanged: (v) async { await AppStore.I.setDone('unit_${u.n}', v ?? false); setState(() {}); },
+        trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          IconButton(icon: Icon(AppStore.I.isDone('unit_${u.n}') ? Icons.check_circle : Icons.check_circle_outline, color: Colors.green), onPressed: () async { await AppStore.I.setDone('unit_${u.n}', !AppStore.I.isDone('unit_${u.n}')); setState(() {}); }),
+          const Icon(Icons.arrow_forward_ios, size: 16),
+        ]),
+        onTap: () => setState(() => selectedUnit = u.n),
       ))),
     ]);
   }
 
+  Widget _lessonBox(String title, String body) => Card(
+    color: const Color(0xFFE8F5F3),
+    child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+      if (body.isNotEmpty) Text(body),
+    ])),
+  );
+
   Widget _skill() {
+    if (selectedSkill != null) {
+      final s = skillTasks[selectedSkill!];
+      return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        TextButton.icon(icon: const Icon(Icons.arrow_back), label: const Text('All skill tasks'), onPressed: () => setState(() => selectedSkill = null)),
+        Text(s[0], style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 8),
+        _lessonBox('🎯 What the examiner checks', 'Speed, accuracy and safety. Do the job in the right order, do not rush, do not skip a step. A safe, tidy worker scores higher than a fast, careless one.'),
+        _lessonBox('📋 Steps — do them in this order', '1. Read the task and check your tools.\n2. ${s[1]}\n3. Check your work before you finish.\n4. Clean up and put tools back.\n5. Tell the examiner you are finished.'),
+        _lessonBox('⚠️ Safety', 'Wear your helmet, gloves and safety shoes. If a tool feels wrong or a machine makes a strange sound, stop and tell the examiner. Never take a shortcut with safety.'),
+        _lessonBox('🗣️ Say it in Korean', '시작하겠습니다. — I will start.\n끝났습니다. — I have finished.\n확인했습니다. — I have checked it.'),
+        ElevatedButton(onPressed: () => speakSlowThenNormal('시작하겠습니다. 끝났습니다.'), child: const Text('🔊 Hear the Korean phrases')),
+        const SizedBox(height: 12),
+        const Text('Interview practice — say it aloud, then tap to hear the model answer:'),
+        _qa('Tell me about yourself', '저는 파키스탄 사람이에요. 저는 열심히 일해요.'),
+        _qa('Why do you want to work in Korea?', '한국에서 일하고 싶어요. 가족을 돕고 싶어요.'),
+        _qa('What will you do if the work is hard?', '포기하지 않아요. 열심히 배울 거예요.'),
+      ]);
+    }
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Round 2 Skill Test — compulsory', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
       const Text('Physical 30 + Interview 30 + Basic skills 40. Below 60% means out, whatever your language score. +5 Job Capacity points. Total 205.'),
       const SizedBox(height: 8),
-      ...skillTasks.map((s) => Card(child: ListTile(title: Text(s[0]), subtitle: Text(s[1])))),
+      const Text('Tap any task to open its help: what the examiner checks, steps in order, safety, and Korean phrases.', style: TextStyle(fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8),
+      ...skillTasks.asMap().entries.map((e) => Card(child: ListTile(
+        leading: const Icon(Icons.build, color: Color(0xFFEF6C00)),
+        title: Text(e.value[0]), subtitle: Text(e.value[1]),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () => setState(() => selectedSkill = e.key),
+      ))),
       const SizedBox(height: 8),
       const Text('Interview practice — say it aloud, then tap to hear the model answer:'),
       _qa('Tell me about yourself', '저는 파키스탄 사람이에요. 저는 열심히 일해요.'),
@@ -515,7 +667,24 @@ class _LearnPageState extends State<LearnPage> {
         ElevatedButton(onPressed: () => setState(() => notebookStep = (notebookStep + 1) % steps.length), child: const Text('Next →')),
       ]),
       const SizedBox(height: 12),
-      const Text('Full sentence, like English "A quick brown fox jumps over the lazy dog" — it covers all the letters in one sentence. As your level rises, Notebook Time gets longer: Level 1 whole words + a first sentence, Levels 2–3 a full sentence, Level 4 a longer sentence, Level 5 a two-line dialogue.'),
+      Card(
+        color: const Color(0xFFFFF3E0),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Text('✏️ Your Korean sentence to write', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(notebookSentence[0], style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+            Text(notebookSentence[1], style: const TextStyle(fontSize: 14)),
+            Text('${notebookSentence[2]} — ${notebookSentence[3]}', style: const TextStyle(fontSize: 15)),
+            const SizedBox(height: 6),
+            Row(children: [
+              ElevatedButton(onPressed: () => speakSlowThenNormal(notebookSentence[0]), child: const Text('🔊 Hear the sentence')),
+              const SizedBox(width: 8),
+              const Expanded(child: Text('Write this whole sentence 3 times in your notebook. As your level rises, Notebook Time gets longer: Levels 2–3 a full sentence, Level 4 a longer sentence, Level 5 a two-line dialogue.')),
+            ]),
+          ]),
+        ),
+      ),
       const SizedBox(height: 8),
       const Card(child: Padding(padding: EdgeInsets.all(12), child: Text('Photo of your notebook page, what you just wrote (optional)\nTake a photo of your own writing, for you only, optional, never checked or graded.'))),
       ElevatedButton(onPressed: () async { await AppStore.I.logStudyDay(); setState(() {}); }, child: const Text('✓ I wrote it')),
@@ -531,43 +700,102 @@ class PracticePage extends StatefulWidget {
 }
 
 class _PracticePageState extends State<PracticePage> {
-  int q = 0, score = 0, tries = 0;
+  int q = 0, score = 0, tries = 0, step = 0;
   String feedback = '';
+  String heardText = '';
   bool done = false;
+
+  // Honest similarity: Hangul exact/contains, or edit distance <= 1-2.
+  bool _isClose(String heard, String target) {
+    String norm(String x) => x.replaceAll(RegExp(r'[\s\.\?\!]+'), '').trim();
+    final h = norm(heard), t = norm(target);
+    if (h.isEmpty) return false;
+    if (h == t || h.contains(t) || t.contains(h)) return true;
+    // Levenshtein distance, small allowance for short words.
+    int dist(String a, String b) {
+      final d = List.generate(a.length + 1, (i) => List.generate(b.length + 1, (j) => i == 0 ? j : (j == 0 ? i : 0)));
+      for (var i = 1; i <= a.length; i++) {
+        for (var j = 1; j <= b.length; j++) {
+          d[i][j] = [d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] == b[j - 1] ? 0 : 1)].reduce((x, y) => x < y ? x : y);
+        }
+      }
+      return d[a.length][b.length];
+    }
+    return dist(h, t) <= (t.length <= 3 ? 1 : 2);
+  }
 
   @override
   Widget build(BuildContext context) {
     final w = vocab[q % vocab.length];
+    const steps = ['1. Listen', '2. Repeat', '3. Speak on mic', '4. Honest result', '5. Listen again'];
     return ListView(padding: const EdgeInsets.all(16), children: [
-      const Text('Speak Test — honest feedback', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-      const Text('Listen to the Korean word, say it on the mic (or tap the word you heard). We only say "Very good!" if it is actually close. 3 tries, then Learn Again takes you back to that lesson.'),
-      const SizedBox(height: 12),
+      const Text('Practice — Speak Test', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF0B2C6B))),
+      const Text('How to practise, like a teacher teaches it. Follow the steps in order — do not skip Step 1.'),
+      const SizedBox(height: 10),
+      Wrap(spacing: 6, children: steps.asMap().entries.map((e) => ChoiceChip(
+        label: Text(e.value, style: const TextStyle(fontSize: 12)),
+        selected: step == e.key,
+        onSelected: (_) => setState(() => step = e.key),
+      )).toList()),
+      const SizedBox(height: 10),
+      Card(
+        color: const Color(0xFFE8F5F3),
+        child: Padding(padding: const EdgeInsets.all(14), child: Text(
+          step == 0 ? 'Step 1 — Listen: tap 🔊 Listen. First slow, then normal speed. Listen 2 times before you speak. Do not guess.' :
+          step == 1 ? 'Step 2 — Repeat: say the word quietly with the sound, 3 times. Break it into letters: listen to each sound, then join them.' :
+          step == 2 ? 'Step 3 — Speak on mic: tap 🎤 Speak on mic, wait for “Listening…”, then say the word clearly, once. Or tap the word you heard below.' :
+          step == 3 ? 'Step 4 — Honest result: we compare what you really said with the correct word. Correct / close = “Very good!” + ⭐. Wrong = “Not quite yet — listen again.” We never say Very good for a wrong word.' :
+          'Step 5 — Listen again: if it was wrong, tap 🔊 Listen again, hear the correct sound, then try again. After 3 tries, tap Learn Again to go back to that lesson.',
+          style: const TextStyle(fontSize: 15),
+        )),
+      ),
+      const SizedBox(height: 10),
       Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
-        Text(w[0], style: const TextStyle(fontSize: 48)),
-        Text('${w[1]} — ${w[2]}'),
-        const SizedBox(height: 8),
+        Text(w[0], style: const TextStyle(fontSize: 48, fontWeight: FontWeight.bold)),
+        Text('${w[1]} — ${w[2]} (${w[3]})'),
+        const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          ElevatedButton(onPressed: () => speakSlowThenNormal(w[0]), child: const Text('🔊 Listen')),
+          ElevatedButton(onPressed: () { setState(() => step = 1); speakSlowThenNormal(w[0]); }, child: const Text('🔊 Listen')),
           const SizedBox(width: 8),
-          ElevatedButton(onPressed: () => _speakTest(w[0]), child: const Text('🎤 Speak on mic')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF6C00)),
+            onPressed: () { setState(() => step = 2); _speakTest(w[0]); },
+            child: const Text('🎤 Speak on mic'),
+          ),
         ]),
         const SizedBox(height: 8),
         const Text('Or tap the word you heard:'),
         Wrap(spacing: 8, children: vocab.sublist(0, 4).map((v) => ElevatedButton(
-          onPressed: () => _answer(v[0] == w[0], w[0]),
+          onPressed: () { setState(() => step = 3); _answer(v[0] == w[0], w[0]); },
           child: Text(v[0]),
         )).toList()),
+        if (heardText.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text('You said: $heardText', style: const TextStyle(fontSize: 14, color: Colors.grey))),
         if (feedback.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(feedback, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
         if (done) Padding(padding: const EdgeInsets.only(top: 8), child: Text('Score: $score correct. ${score >= 3 ? "Wah bhai wah, Korea pakka!" : "Ghalat jawab, lekin himmat na haar, dobara kar!"}')),
+        if (tries >= 3) TextButton(onPressed: () { setState(() { tries = 0; feedback = ''; step = 0; }); }, child: const Text('📚 Learn Again — back to this lesson')),
       ]))),
-      const SizedBox(height: 12),
-      const Text('Culture & manners', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      ...cultureLessons.map((c) => ListTile(leading: const Icon(Icons.emoji_people), title: Text(c))),
+      const SizedBox(height: 14),
+      const Text('🇰🇷 Culture & manners — real situations', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0B2C6B))),
+      const Text('Tap a situation to see what to do, what NOT to do, and the Korean words to say.'),
+      const SizedBox(height: 8),
+      ...cultureScenarios.map((c) => Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(c[0], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Text('🎬 Situation: ${c[1]}'),
+        Text('✅ Do: ${c[2]}', style: const TextStyle(color: Colors.green)),
+        Text('❌ Do NOT: ${c[3]}', style: const TextStyle(color: Colors.red)),
+        const SizedBox(height: 6),
+        Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFE8F5F3), borderRadius: BorderRadius.circular(10)), child: Row(children: [
+          Expanded(child: Text('${c[4]} (${c[5]}) — ${c[6]}', style: const TextStyle(fontWeight: FontWeight.bold))),
+          IconButton(icon: const Icon(Icons.volume_up), onPressed: () => speakSlowThenNormal(c[4])),
+        ])),
+      ])))),
     ]);
   }
 
   void _answer(bool correct, String target) {
     setState(() {
+      step = 3;
       if (correct) {
         score++;
         feedback = 'Very good! ⭐ $target — correct.';
@@ -577,7 +805,7 @@ class _PracticePageState extends State<PracticePage> {
       } else {
         tries++;
         feedback = tries >= 3
-            ? 'Not quite yet — listen again, then Learn Again takes you back to that lesson.'
+            ? 'Not quite yet — listen again. You have tried 3 times: tap Learn Again to go back to that lesson, then come back.'
             : 'Not quite yet — listen again. Try ${3 - tries} more time(s).';
         speak(target);
       }
@@ -589,11 +817,12 @@ class _PracticePageState extends State<PracticePage> {
     try {
       final ok = await stt.initialize();
       if (!ok) { setState(() => feedback = 'Mic / speech recognition is not available on this phone. Use Listen-and-Tap instead — the test is never blocked.'); return; }
-      setState(() => feedback = 'Listening… say it now.');
+      setState(() { feedback = 'Listening… say it now, clearly, once.'; heardText = ''; });
       await stt.listen(onResult: (r) {
         if (r.finalResult) {
           final heard = r.recognizedWords;
-          _answer(heard.contains(target) || heard.isNotEmpty && target.length <= 2, target);
+          setState(() => heardText = heard.isEmpty ? '(nothing heard)' : heard);
+          _answer(_isClose(heard, target), target);
           stt.stop();
         }
       }, localeId: 'ko-KR');
@@ -613,17 +842,44 @@ class MockPage extends StatefulWidget {
 class _MockPageState extends State<MockPage> {
   int qi = 0, listening = 0, reading = 0;
   bool started = false, finished = false;
+  String difficulty = 'basic';
   int secondsLeft = 50 * 60;
-  final rnd = Random();
+
+  /// Shuffled options for question qi: correct + 3 wrong, position randomised.
+  List<String> _options(String correct, List<String> wrongs, int seed) {
+    final opts = <String>[correct, ...wrongs]..shuffle(Random(seed));
+    return opts;
+  }
 
   @override
   Widget build(BuildContext context) {
     if (!started) {
       return ListView(padding: const EdgeInsets.all(16), children: [
-        const Text('Mock Test — 40 questions, 50 minutes, 100 points', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-        const Text('20 reading + 20 listening. Passing floor 60/100. Pakistan 2026 merit 82.5/100 (reported).'),
+        const Text('Mock Test — 40 questions, 50 minutes, 100 points', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF0B2C6B))),
+        const Text('20 reading + 20 listening. Passing floor 60/100. Pakistan 2026 merit 82.5/100 (reported — check the latest OEC notice).'),
         const SizedBox(height: 12),
-        ElevatedButton(onPressed: () => setState(() { started = true; _tick(); }), child: const Text('Start full mock (50 min)')),
+        const Text('Choose your difficulty:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        const SizedBox(height: 8),
+        Card(color: difficulty == 'basic' ? const Color(0xFFE8F5E9) : Colors.white, child: ListTile(
+          leading: const Text('🟢', style: TextStyle(fontSize: 24)),
+          title: const Text('Basic — for beginners', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('Easy words and short questions. Learn the format, build confidence.'),
+          trailing: difficulty == 'basic' ? const Icon(Icons.check_circle, color: Colors.green) : null,
+          onTap: () => setState(() => difficulty = 'basic'),
+        )),
+        Card(color: difficulty == 'expert' ? const Color(0xFFFFEBEE) : Colors.white, child: ListTile(
+          leading: const Text('🔴', style: TextStyle(fontSize: 24)),
+          title: const Text('Expert — real test level', style: TextStyle(fontWeight: FontWeight.bold)),
+          subtitle: const Text('Harder, longer, real EPS-TOPIK style reading and listening from the new syllabus (Units 1–60, safety, laws). Aiming at the 82.5/100 merit, not just the 60 pass floor.'),
+          trailing: difficulty == 'expert' ? const Icon(Icons.check_circle, color: Colors.red) : null,
+          onTap: () => setState(() => difficulty = 'expert'),
+        )),
+        const SizedBox(height: 12),
+        ElevatedButton(
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF6C00), minimumSize: const Size.fromHeight(52)),
+          onPressed: () => setState(() { started = true; _tick(); }),
+          child: Text('Start ${difficulty == 'expert' ? 'Expert' : 'Basic'} mock (50 min)', style: const TextStyle(fontSize: 16)),
+        ),
         const SizedBox(height: 12),
         const Text('Your past attempts:'),
         ...((AppStore.I.progress['mocks'] as List? ?? []).map((m) => ListTile(
@@ -637,33 +893,56 @@ class _MockPageState extends State<MockPage> {
       return Center(child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, children: [
         Text('Result: $total / 100', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         Text('Listening $listening/20 • Reading $reading/20'),
+        Text('${difficulty == 'expert' ? 'Expert' : 'Basic'} mock', style: const TextStyle(fontWeight: FontWeight.bold)),
         Text(total >= 82.5 ? 'Wah bhai wah, Korea pakka! Above merit.' : total >= 60 ? 'Passed the floor (60), but below merit 82.5 — practise your weak topics.' : 'Ghalat jawab, lekin himmat na haar, dobara kar! Below 60 — learn again.'),
         const SizedBox(height: 12),
         ElevatedButton(onPressed: () => setState(() { started = false; finished = false; qi = 0; listening = 0; reading = 0; secondsLeft = 50 * 60; }), child: const Text('Back')),
       ])));
     }
-    final w = vocab[qi % vocab.length];
     final isListening = qi < 20;
+    final isExpert = difficulty == 'expert';
+    // Correct answer text + 3 wrong texts, shuffled with a per-question seed
+    // so the correct position varies across A–D and is never predictable.
+    late String prompt, promptKo;
+    late List<String> options;
+    late String correctText;
+    if (isExpert) {
+      final bank = isListening ? expertListening : expertReading;
+      final e = bank[qi % bank.length];
+      promptKo = e[0];
+      prompt = isListening ? 'Listen, then tap the correct meaning:' : 'Read the sentence, then tap the correct meaning:';
+      correctText = e[1];
+      options = _options(e[1], [e[2], e[3], e[4]], 9871 + qi * 37);
+    } else {
+      final w = vocab[qi % vocab.length];
+      promptKo = w[0];
+      prompt = isListening ? 'Listen, then tap the meaning:' : 'What does this mean?';
+      correctText = '${w[2]} — ${w[3]}';
+      final wrongs = [vocab[(qi + 5) % vocab.length], vocab[(qi + 11) % vocab.length], vocab[(qi + 17) % vocab.length]]
+          .map((v) => '${v[2]} — ${v[3]}').toList();
+      options = _options(correctText, wrongs, 12345 + qi * 31);
+    }
+    const letters = ['A', 'B', 'C', 'D'];
     return ListView(padding: const EdgeInsets.all(16), children: [
-      Text('⏱ ${secondsLeft ~/ 60}:${(secondsLeft % 60).toString().padLeft(2, '0')} left — Question ${qi + 1}/40 (${isListening ? 'Listening' : 'Reading'})',
+      Text('⏱ ${secondsLeft ~/ 60}:${(secondsLeft % 60).toString().padLeft(2, '0')} left — ${isExpert ? 'Expert' : 'Basic'} — Question ${qi + 1}/40 (${isListening ? 'Listening' : 'Reading'})',
           style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       const SizedBox(height: 12),
       Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
-        Text(isListening ? 'Listen, then tap the meaning:' : 'What does this mean?', style: const TextStyle(fontSize: 16)),
-        Text(w[0], style: const TextStyle(fontSize: 44)),
-        if (isListening) ElevatedButton(onPressed: () => speak(w[0]), child: const Text('🔊 Hear it')),
+        Text(prompt, style: const TextStyle(fontSize: 16)),
+        Text(promptKo, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+        if (isListening) ElevatedButton(onPressed: () => speak(promptKo), child: const Text('🔊 Hear it')),
         const SizedBox(height: 12),
-        ...List.generate(4, (i) {
-          final opt = vocab[(qi + i * 7) % vocab.length];
+        ...options.asMap().entries.map((e) {
+          final idx = e.key, opt = e.value;
           return Padding(padding: const EdgeInsets.only(bottom: 8), child: SizedBox(width: double.infinity, child: ElevatedButton(
             onPressed: () async {
-              if (opt[0] == w[0]) { if (isListening) { listening++; } else { reading++; } }
+              if (opt == correctText) { if (isListening) { listening++; } else { reading++; } }
               if (qi + 1 >= 40) {
                 await AppStore.I.addMock(listening, reading);
                 setState(() => finished = true);
               } else { setState(() => qi++); }
             },
-            child: Text('${opt[2]} — ${opt[3]}'),
+            child: Text('${letters[idx]}. $opt'),
           )));
         }),
       ]))),
@@ -707,29 +986,45 @@ class _TutorPageState extends State<TutorPage> {
     return tutorLang;
   }
 
+  String _meaningFor(List<String> e, String lang) {
+    // tutorBank columns: 0 keywords, 1 ko, 2 rom, 3 en, 4 roman-urdu, 5 punjabi, 6 pashto, 7 sindhi, 8 saraiki
+    switch (lang) {
+      case 'Urdu': return e[4];
+      case 'Punjabi': return e[5];
+      case 'Pashto': return e[6];
+      case 'Sindhi': return e[7];
+      case 'Saraiki': return e[8];
+      default: return e[3];
+    }
+  }
+
   void ask(String q) {
     final lang = detectLang(q);
     setState(() => detected = lang);
-    // Simple local tutor: match the starter set, else give the hunger example
-    // plus a generic Korean answer. Full tutor answers come from the
-    // prototype's askTutor data in production; this build answers in the
-    // same language the question was asked in.
-    String ko = '배가 고파요', rom = 'baega gopayo', meaning = '';
-    if (q.toLowerCase().contains('hungry') || q.contains('bhookh') || q.contains('bukh') || q.contains('wagi') || q.contains('bhuk')) {
-      ko = '배가 고파요'; rom = 'baega gopayo';
-      meaning = lang == 'Pashto' ? 'Za wagi yam' : lang == 'Sindhi' ? 'Moon khi bukh lagi aahy' : lang == 'Saraiki' ? 'Mainu bhuk lagi ae' : lang == 'Punjabi' ? 'Mainu bhookh lagi hai' : lang == 'Urdu' ? 'Mujhe bhookh lagi hai' : 'I am hungry';
-    } else if (q.toLowerCase().contains('hello') || q.contains('salaam') || q.contains('salam')) {
-      ko = '안녕하세요'; rom = 'annyeonghaseyo';
-      meaning = lang == 'Urdu' ? 'Salaam' : lang == 'Pashto' ? 'Salaam' : lang == 'Sindhi' ? 'Salaam' : lang == 'Saraiki' ? 'Salaam' : lang == 'Punjabi' ? 'Sat Sri Akal / Salaam' : 'Hello';
-    } else if (q.toLowerCase().contains('thank')) {
-      ko = '감사합니다'; rom = 'gamsahamnida';
-      meaning = lang == 'Urdu' ? 'Shukriya' : 'Thank you';
-    } else {
-      ko = '안녕하세요'; rom = 'annyeonghaseyo';
-      meaning = lang == 'Urdu' ? 'Salaam — is sawal ka jawab: $ko' : 'Hello — the Korean answer is: $ko';
+    final query = q.toLowerCase().trim();
+    if (query.isEmpty) {
+      setState(() => answer = 'Please type or speak a question first. Try one of the starters below.');
+      return;
     }
-    setState(() => answer = 'Korean: $ko ($rom)\nMeaning in $lang: $meaning');
-    speakSlowThenNormal(ko);
+    // Match the tutor bank by keyword — never a default greeting.
+    for (final e in tutorBank) {
+      final keys = e[0].split(',');
+      for (final k in keys) {
+        final key = k.trim();
+        if (key.length >= 2 && (query.contains(key) || (key.length >= 4 && key.split(' ').every((w) => w.isEmpty || query.contains(w))))) {
+          final ko = e[1], rom = e[2];
+          setState(() => answer = 'Korean: $ko ($rom)\nMeaning in $lang: ${_meaningFor(e, lang)}');
+          speakSlowThenNormal(ko);
+          return;
+        }
+      }
+    }
+    // No match: say so honestly, never return a default Salaam answer.
+    setState(() => answer = lang == 'Urdu'
+        ? 'Ye sawal main abhi nahi janta. Neeche diye gaye sawalon mein se ek try karein, ya sawal dobara aasan lafzon mein poochhein.'
+        : lang == 'Pashto'
+            ? 'Za da pohtana na pohegam. Lande pohtano na yaw wakhla.'
+            : 'I do not know that question yet. Please try one of the starter questions below, or ask it again in simpler words.');
   }
 
   @override
@@ -773,7 +1068,7 @@ class _TutorPageState extends State<TutorPage> {
         trailing: IconButton(icon: const Icon(Icons.volume_up), onPressed: () => speakSlowThenNormal(s[2])),
         onTap: () { qC.text = s[1]; ask(s[1]); },
       )),
-      const Text('Note: speech recognition depends on the phone — if your language is not supported on this phone, the app says so and typing always works. Answers here are from the built-in tutor data; the full online tutor (prototype askTutor) is the next server step.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+      const Text('Note: speech recognition depends on the phone — if your language is not supported on this phone, the app says so and typing always works. The tutor answers from its built-in question bank; if it does not know your question, it says so honestly instead of guessing.', style: TextStyle(fontSize: 12, color: Colors.grey)),
     ]);
   }
 }
