@@ -453,6 +453,7 @@ class _LearnPageState extends State<LearnPage> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('1) Full alphabets first — like A B C D', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
       const Text('Tap a letter to hear it. Vowels first, then consonants.'),
+      const Text('✍️ Stroke order: always write top to bottom, left to right. One syllable = one block (e.g. ㅎ + ㅏ + ㄴ = 한). Trace the big letter in the air, then write it 5 times in your notebook.', style: TextStyle(fontSize: 13, color: Colors.grey)),
       const SizedBox(height: 8),
       Text('Vowels — Letter ${vowelIdx + 1} of 21', style: const TextStyle(fontWeight: FontWeight.bold)),
       Row(children: [
@@ -539,6 +540,9 @@ class _LearnPageState extends State<LearnPage> {
             : u.book == '1'
                 ? '이것은 ${u.ko}입니다. — This is about ${u.en.toLowerCase()}.\n${u.ko}에 대해 이야기해요. — Let us talk about ${u.en.toLowerCase()}.'
                 : '직장에서 ${u.ko}이/가 중요해요. — At work, ${u.en.toLowerCase()} is important.\n안전하게 일하세요. — Work safely.'),
+        _lessonBox('🎭 Situational roleplay — use it at work', u.book == '2'
+            ? 'Roleplay with a colleague: you are at work and you must use this unit. Say the Korean sentence aloud, then answer your colleague. Example: boss asks you a question about ${u.en.toLowerCase()} — answer politely with -요 / -습니다, then check with a senior if you are unsure.'
+            : 'Roleplay in daily life: you are in Korea and you need ${u.en.toLowerCase()}. Say the Korean sentence aloud to a shopkeeper, a friend or a doctor. If they do not understand, say it slowly again, then point and say “이거요”.'),
         _lessonBox('🔑 5 key words in this unit', ''),
         ...keyWords.map((w) => Card(child: ListTile(title: Text('${w[0]} • ${w[1]}', style: const TextStyle(fontSize: 17)), subtitle: Text('${w[2]} — ${w[3]}'), trailing: IconButton(icon: const Icon(Icons.volume_up), onPressed: () => speakSlowThenNormal(w[0]))))),
         const SizedBox(height: 8),
@@ -805,8 +809,8 @@ class _PracticePageState extends State<PracticePage> {
       } else {
         tries++;
         feedback = tries >= 3
-            ? 'Not quite yet — listen again. You have tried 3 times: tap Learn Again to go back to that lesson, then come back.'
-            : 'Not quite yet — listen again. Try ${3 - tries} more time(s).';
+            ? 'Not quite yet — listen again. Why: the sounds you said did not match $target. Listen to each letter of $target, then say it slowly. You have tried 3 times: tap Learn Again to go back to that lesson, then come back.'
+            : 'Not quite yet — listen again. Why: the word you said was not $target — listen to the first sound again, then try ${3 - tries} more time(s).';
         speak(target);
       }
     });
@@ -893,6 +897,13 @@ class _MockPageState extends State<MockPage> {
       return Center(child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, children: [
         Text('Result: $total / 100', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         Text('Listening $listening/20 • Reading $reading/20'),
+        const SizedBox(height: 8),
+        Text('📊 Analytics: Listening ${(listening * 5)}%  •  Reading ${(reading * 5)}%  •  Pass line 60  •  Merit line 82.5'),
+        Text(listening <= reading
+            ? 'Weak area: Listening — do 10 minutes of Listen-and-Tap every day before your next mock.'
+            : 'Weak area: Reading — re-read Units 1–30 slowly, then try the Expert mock again.',
+            textAlign: TextAlign.center),
+        Text('Time used: ${50 * 60 - secondsLeft} seconds of 50 minutes. In the real CBT test the clock never stops — finish each question in about 75 seconds.', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Colors.grey)),
         Text('${difficulty == 'expert' ? 'Expert' : 'Basic'} mock', style: const TextStyle(fontWeight: FontWeight.bold)),
         Text(total >= 82.5 ? 'Wah bhai wah, Korea pakka! Above merit.' : total >= 60 ? 'Passed the floor (60), but below merit 82.5 — practise your weak topics.' : 'Ghalat jawab, lekin himmat na haar, dobara kar! Below 60 — learn again.'),
         const SizedBox(height: 12),
