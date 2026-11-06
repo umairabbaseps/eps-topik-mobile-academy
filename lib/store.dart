@@ -172,11 +172,18 @@ class AppStore {
     await saveProgress(p);
   }
 
-  Future<void> addMock(int listening, int reading) async {
+  Future<void> addMock(int listening, int reading,
+      {String difficulty = 'basic', int secondsUsed = 0}) async {
     final p = progress;
     final mocks = List<Map<String, dynamic>>.from(
         (p['mocks'] as List? ?? []).map((e) => Map<String, dynamic>.from(e)));
-    mocks.add({'l': listening, 'r': reading, 'date': DateTime.now().toIso8601String()});
+    mocks.add({
+      'l': listening,
+      'r': reading,
+      'date': DateTime.now().toIso8601String(),
+      'd': difficulty,
+      'secs': secondsUsed,
+    });
     p['mocks'] = mocks;
     await saveProgress(p);
   }

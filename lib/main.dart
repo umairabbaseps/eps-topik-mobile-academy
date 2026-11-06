@@ -4,6 +4,7 @@ import 'package:flutter_tts/flutter_tts.dart';
 import 'package:speech_to_text/speech_to_text.dart';
 import 'data.dart';
 import 'store.dart';
+import 'theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,12 +42,12 @@ class _EpsAppState extends State<EpsApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.teal,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0B2C6B), primary: const Color(0xFF0B2C6B), secondary: const Color(0xFF00897B), tertiary: const Color(0xFFFF7043)),
-        scaffoldBackgroundColor: const Color(0xFFF2F5FA),
+        colorScheme: ColorScheme.fromSeed(seedColor: AppColors.navy, primary: AppColors.navy, secondary: AppColors.tealDark, tertiary: AppColors.orangeDark),
+        scaffoldBackgroundColor: AppColors.pageBg,
         fontFamily: AppStore.I.lang == 'script' ? 'NotoNastaliq' : null,
         useMaterial3: true,
-        appBarTheme: const AppBarTheme(backgroundColor: Color(0xFF0B2C6B), foregroundColor: Colors.white, centerTitle: false),
-        elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF0B2C6B), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
+        appBarTheme: const AppBarTheme(backgroundColor: AppColors.navy, foregroundColor: Colors.white, centerTitle: false),
+        elevatedButtonTheme: ElevatedButtonThemeData(style: ElevatedButton.styleFrom(backgroundColor: AppColors.navy, foregroundColor: Colors.white, minimumSize: const Size.fromHeight(48), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)))),
         cardTheme: const CardThemeData(elevation: 2, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(16)))),
       ),
       home: const RootPage(),
@@ -62,76 +63,104 @@ class RootPage extends StatefulWidget {
 
 class _RootPageState extends State<RootPage> {
   int tab = 0;
-  final List<String> trail = [];
-  // 3-path entry points (v1.3.0). LearnPage / MockPage read these ONCE in
-  // initState; changing the seed forces a fresh page (new ValueKey) so a
-  // path tap always lands on its real starting screen, never a stale one.
-  // 'basic' -> Hangul, 'mid' -> Unit 11, 'expert' -> Unit 31 / Expert mock.
+  // Real back stack (P0-1): history of tabs, newest last. Back pops it;
+  // it never jumps Home unless Home is genuinely the previous screen.
+  final List<int> tabHistory = [0];
   String? learnStart;
+  int? learnStartUnit;
   int learnSeed = 0;
   String mockDifficulty = 'basic';
   int mockSeed = 0;
+  // Key to the Learn page, so Back can close a Unit/Skill detail first
+  // (previous screen) instead of jumping to Home.
+  final GlobalKey<_LearnPageState> learnKey = GlobalKey<_LearnPageState>();
   String get lang => AppStore.I.lang;
   String tr(String k) => t(lang, k);
 
+  void _pushTab(int i) {
+    if (tabHistory.isEmpty || tabHistory.last != i) tabHistory.add(i);
+    if (tabHistory.length > 20) tabHistory.removeAt(0);
+  }
+
   /// Choose a learning path. Sets the STARTING level only — it does NOT
   /// mark any unit done and does NOT lock anything: level is a display /
-  /// Notebook-Time scale, not a gate. A Mid learner can still open Units
-  /// 0-10 any time, and a Basic learner can still try the Expert mock.
-  /// Mark-done (progress['done']) stays the only record of finished work,
-  /// so switching paths never wipes progress.
+  /// Notebook-Time scale, not a gate.
   Future<void> choosePath(String path) async {
     if (path == 'basic') {
       await AppStore.I.setLevel(1);
-      setState(() { learnStart = 'basic'; learnSeed++; tab = 1; trail.add('Learn — Basic'); });
+      setState(() { learnStart = 'basic'; learnStartUnit = null; learnSeed++; tab = 1; _pushTab(1); });
     } else if (path == 'mid') {
       await AppStore.I.setLevel(3);
-      setState(() { learnStart = 'mid'; learnSeed++; tab = 1; trail.add('Learn — Mid'); });
+      setState(() { learnStart = 'mid'; learnStartUnit = null; learnSeed++; tab = 1; _pushTab(1); });
     } else if (path == 'expert') {
       await AppStore.I.setLevel(5);
-      setState(() { learnStart = 'expert'; learnSeed++; tab = 1; trail.add('Learn — Expert'); });
+      setState(() { learnStart = 'expert'; learnStartUnit = null; learnSeed++; tab = 1; _pushTab(1); });
     } else if (path == 'expert-mock') {
       await AppStore.I.setLevel(5);
-      setState(() { mockDifficulty = 'expert'; mockSeed++; tab = 3; trail.add('Mock — Expert'); });
+      setState(() { mockDifficulty = 'expert'; mockSeed++; tab = 2; _pushTab(2); });
     }
   }
 
+  /// Continue where the learner left off (P0-3): first unit not yet
+  /// marked done, or Unit 0 for a brand-new learner.
+  void goContinue() {
+    int next = 0;
+    for (int n = 0; n <= 60; n++) {
+      if (!AppStore.I.isDone('unit_$n')) { next = n; break; }
+      next = 0;
+    }
+    setState(() { learnStart = 'continue'; learnStartUnit = next; learnSeed++; tab = 1; _pushTab(1); });
+  }
+
+  /// Open Learn at a named section (e.g. 'life' for Life in Korea).
+  void goLearnSection(String section) {
+    setState(() { learnStart = 'section:$section'; learnStartUnit = null; learnSeed++; tab = 1; _pushTab(1); });
+  }
+
   void goTab(int i, String name) {
-    setState(() {
-      tab = i;
-      trail.add(name);
-    });
+    setState(() { tab = i; _pushTab(i); });
   }
 
   void goHome() => setState(() {
         tab = 0;
-        trail.clear();
+        tabHistory.clear();
+        tabHistory.add(0);
       });
 
-  void goBack() => setState(() {
-        if (trail.isNotEmpty) trail.removeLast();
-        if (trail.isEmpty) tab = 0;
-      });
+  void goBack() {
+    // 1) Close an open Unit/Skill detail in Learn first.
+    if (tab == 1 && learnKey.currentState != null && learnKey.currentState!.hasDetail) {
+      setState(() => learnKey.currentState!.closeDetail());
+      return;
+    }
+    // 2) Otherwise pop the real tab history — never jump Home blindly.
+    setState(() {
+      if (tabHistory.length > 1) {
+        tabHistory.removeLast();
+        tab = tabHistory.last;
+      } else {
+        tab = 0;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     if (AppStore.I.session == null) return AuthScreen(onDone: () => setState(() {}));
     final pages = [
-      HomePage(onGo: goTab, onStart: () => goTab(1, 'Learn'), onChoosePath: choosePath),
-      LearnPage(key: ValueKey('learn-$learnSeed'), start: learnStart),
-      const PracticePage(),
-      MockPage(key: ValueKey('mock-$mockSeed'), initialDifficulty: mockDifficulty),
+      HomePage(onGo: goTab, onStart: goContinue, onChoosePath: choosePath, onLearnSection: goLearnSection),
+      LearnPage(key: learnKey, start: learnStart, startUnit: learnStartUnit),
+      MockPage(key: ValueKey('mock-$mockSeed'), initialDifficulty: mockDifficulty, onGoLearn: () => goTab(1, 'Learn')),
       const TutorPage(),
-      const GamesPage(),
-      const SettingsPage(),
+      const MorePage(),
     ];
-    final titles = [tr('home'), tr('learn'), tr('practice'), tr('mock'), tr('tutor'), 'Games', tr('settings')];
+    final titles = [tr('home'), tr('learn'), tr('mock'), tr('tutor'), 'More'];
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           tooltip: tr('back'),
-          onPressed: tab == 0 && trail.isEmpty ? null : goBack,
+          onPressed: tab == 0 && tabHistory.length <= 1 ? null : goBack,
         ),
         title: Text(titles[tab]),
         actions: [
@@ -139,27 +168,67 @@ class _RootPageState extends State<RootPage> {
         ],
       ),
       body: SafeArea(child: pages[tab]),
+      // P0-1: 4 tabs only (Home / Learn / Mock / Tutor) + More.
+      // Practice, Games and Settings live under More — 7 tabs did not
+      // fit a phone and "Games" was hard-coded English.
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: tab,
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: const Color(0xFF0B2C6B),
-        onTap: (i) => setState(() {
-          tab = i;
-          trail.clear();
-        }),
+        selectedItemColor: AppColors.navy,
+        unselectedItemColor: AppColors.muted,
+        onTap: (i) => setState(() { tab = i; _pushTab(i); }),
         items: [
           BottomNavigationBarItem(icon: const Icon(Icons.home), label: tr('home')),
           BottomNavigationBarItem(icon: const Icon(Icons.school), label: tr('learn')),
-          BottomNavigationBarItem(icon: const Icon(Icons.edit), label: tr('practice')),
           BottomNavigationBarItem(icon: const Icon(Icons.timer), label: tr('mock')),
           BottomNavigationBarItem(icon: const Icon(Icons.mic), label: tr('tutor')),
-          const BottomNavigationBarItem(icon: Icon(Icons.videogame_asset), label: 'Games'),
-          BottomNavigationBarItem(icon: const Icon(Icons.settings), label: tr('settings')),
+          const BottomNavigationBarItem(icon: Icon(Icons.more_horiz), label: 'More'),
         ],
       ),
     );
   }
 }
+
+/// "More" sheet-tab (P0-1): Practice, Games and Settings. Each opens as
+/// a real pushed screen, so the system/AppBar Back returns here — a real
+/// per-tab stack, not a trail that jumps Home.
+class MorePage extends StatelessWidget {
+  const MorePage({super.key});
+  void _open(BuildContext context, String title, Widget page) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => Scaffold(
+        appBar: AppBar(title: Text(title), backgroundColor: AppColors.navy, foregroundColor: Colors.white),
+        body: SafeArea(child: page),
+      ),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(padding: const EdgeInsets.all(16), children: [
+      const Text('More', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.ink)),
+      const SizedBox(height: 4),
+      const Text('Practice, games and settings — everything else lives here so the bottom bar stays to 4 tabs.', style: TextStyle(fontSize: 14, color: AppColors.muted)),
+      const SizedBox(height: 12),
+      _row(context, Icons.edit, AppColors.navy, 'Practice', 'Speak Test • Culture & manners • Notebook', () => _open(context, 'Practice', const PracticePage())),
+      _row(context, Icons.videogame_asset, AppColors.purple, 'Games', 'Listen and Tap — play & learn', () => _open(context, 'Games', const GamesPage())),
+      _row(context, Icons.settings, AppColors.muted, 'Settings', 'Language • Account • Sound • Help', () => _open(context, 'Settings', const SettingsPage())),
+    ]);
+  }
+
+  Widget _row(BuildContext context, IconData icon, Color c, String title, String sub, VoidCallback onTap) => Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        child: ListTile(
+          leading: Container(width: 48, height: 48, decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: c, size: 24)),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.ink)),
+          subtitle: Text(sub, style: const TextStyle(fontSize: 14, color: AppColors.muted)),
+          trailing: const Icon(Icons.arrow_forward_ios, size: 15, color: AppColors.muted),
+          onTap: onTap,
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        ),
+      );
+}
+
 
 // ---------------- Auth ----------------
 class AuthScreen extends StatefulWidget {
@@ -272,8 +341,8 @@ class _AuthScreenState extends State<AuthScreen> {
                 final ok = await AppStore.I.register(id, name, pwC.text, codeC.text.trim());
                 if (ok) { widget.onDone(); } else { setState(() => msg = 'Wrong code, or this account already exists.'); }
               } else {
-                final ok = await AppStore.I.resetPassword(id, codeC.text.trim(), pwC.text.isEmpty ? '123456' : pwC.text);
-                // reset needs a new password: reuse pw field via dialog
+                if (pwC.text.length < 6) { setState(() => msg = 'Enter a new password of 6+ characters in the password field first.'); return; }
+                final ok = await AppStore.I.resetPassword(id, codeC.text.trim(), pwC.text);
                 if (ok) { setState(() { mode = 'login'; msg = 'Password reset. Please log in.'; }); }
                 else { setState(() => msg = 'Wrong code or no such account.'); }
               }
@@ -296,7 +365,7 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
           const SizedBox(height: 8),
           const Text('Guest progress stays on this phone only — register to keep it on any mobile.',
-              textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey)),
+              textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: AppColors.muted)),
         ]),
       ),
     );
@@ -315,7 +384,8 @@ class HomePage extends StatefulWidget {
   final void Function(int, String) onGo;
   final VoidCallback onStart;
   final void Function(String) onChoosePath;
-  const HomePage({super.key, required this.onGo, required this.onStart, required this.onChoosePath});
+  final void Function(String) onLearnSection;
+  const HomePage({super.key, required this.onGo, required this.onStart, required this.onChoosePath, required this.onLearnSection});
   @override
   State<HomePage> createState() => _HomePageState();
 }
@@ -326,7 +396,6 @@ class _HomePageState extends State<HomePage> {
   // pale grey background, one accent per action, generous spacing.
   static const _tealDark = Color(0xFF004D40);
   static const _green = Color(0xFF00A859);
-  static const _lime = Color(0xFF8DC63F);
   static const _navy = Color(0xFF0B2C6B);
   static const _ink = Color(0xFF1A2B3C);
   static const _muted = Color(0xFF5F6B7A);
@@ -342,6 +411,15 @@ class _HomePageState extends State<HomePage> {
     // Today's plan follows the 12-week plan: one week per 7 study days.
     final weekIdx = ((days / 7).floor()).clamp(0, selfStudyPlan.length - 1);
     final week = selfStudyPlan[weekIdx];
+    // P0-3: Continue = first unit not yet done; best mock vs the 82.5 merit.
+    int continueUnit = 0;
+    for (int n = 0; n <= 60; n++) { if (!store.isDone('unit_$n')) { continueUnit = n; break; } }
+    double bestMock = 0;
+    for (final m in (store.progress['mocks'] as List? ?? [])) {
+      final t = ((m['l'] ?? 0) + (m['r'] ?? 0)) * 2.5;
+      if (t > bestMock) bestMock = t;
+    }
+    final meritGap = 82.5 - bestMock;
     return Container(
       color: _pageBg,
       child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), children: [
@@ -351,7 +429,7 @@ class _HomePageState extends State<HomePage> {
         Container(
           decoration: BoxDecoration(
             gradient: const LinearGradient(
-              colors: [_tealDark, _green, _lime],
+              colors: [AppColors.tealDark, AppColors.navy],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
             ),
@@ -366,12 +444,12 @@ class _HomePageState extends State<HomePage> {
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Salaam, ${store.currentName}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white)),
                 Text(store.isGuest ? 'Guest — on this phone only' : 'EPS TOPIK Pro Pakistan • Korea Pakka!',
-                    style: const TextStyle(fontSize: 12, color: Colors.white70)),
+                    style: const TextStyle(fontSize: 14, color: Colors.white)),
               ])),
             ]),
             const SizedBox(height: 18),
             Text('Level ${store.level}', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white, height: 1.0)),
-            const Text('of 5  •  your test-ready level', style: TextStyle(fontSize: 13, color: Colors.white70)),
+            const Text('of 5  •  your test-ready level', style: TextStyle(fontSize: 14, color: Colors.white)),
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
@@ -388,18 +466,38 @@ class _HomePageState extends State<HomePage> {
               _stat('$days', 'study days'),
               _stat('$mocks', 'mock tests'),
             ]),
+            const SizedBox(height: 10),
+            Row(children: [
+              const Icon(Icons.emoji_events, color: Colors.white, size: 20),
+              const SizedBox(width: 6),
+              Expanded(child: Text(
+                bestMock > 0
+                    ? (bestMock >= 82.5 ? 'Best mock $bestMock / 100 — above the 82.5 merit. Keep it up.' : 'Best mock $bestMock / 100 — ${meritGap.toStringAsFixed(1)} points below the 82.5 merit.')
+                    : 'No mock yet — your best mock vs the 82.5 merit will show here.',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Colors.white))),
+            ]),
+            const SizedBox(height: 6),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: (bestMock / 82.5).clamp(0.0, 1.0),
+                minHeight: 8,
+                backgroundColor: Colors.white30,
+                valueColor: const AlwaysStoppedAnimation(Colors.white),
+              ),
+            ),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.white,
-                  foregroundColor: _tealDark,
+                  foregroundColor: AppColors.tealDark,
                   minimumSize: const Size.fromHeight(52),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                 ),
                 onPressed: widget.onStart,
-                child: Text('▶  ${t(lang, 'startLearning')} — Lesson 1', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                child: Text(continueUnit == 0 && (store.progress['done'] as List? ?? []).isEmpty ? '▶  ${t(lang, 'startLearning')} — Lesson 1' : '▶  Continue — Unit $continueUnit', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               ),
             ),
           ]),
@@ -413,10 +511,10 @@ class _HomePageState extends State<HomePage> {
         const Text('Choose your path', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _ink)),
         const SizedBox(height: 4),
         const Text('The 2026 test is hard — pass 60/100, merit 82.5/100. Pick where YOU start. You can change path any time; nothing is locked and finished units stay finished.',
-            style: TextStyle(fontSize: 13, color: _muted)),
+            style: TextStyle(fontSize: 14, color: _muted)),
         const SizedBox(height: 10),
         _pathCard(
-          icon: '🟢', badge: 'BASIC', badgeColor: _green,
+          icon: Icons.school, badge: 'BASIC', badgeColor: AppColors.greenDark,
           title: 'Basic — Start from zero',
           desc: 'You know no Korean yet, or only a few words.',
           includes: 'Hangul alphabet walk (21 vowels + 19 consonants) • Syllable / word builder • First words • Units 0–10 • Notebook Time',
@@ -427,7 +525,7 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 12),
         _pathCard(
-          icon: '🟡', badge: 'MID', badgeColor: const Color(0xFFEF6C00),
+          icon: Icons.menu_book, badge: 'MID', badgeColor: AppColors.orangeDark,
           title: 'Mid — I know some Korean',
           desc: 'You can read Hangul and know some words. Skip the basics.',
           includes: 'Start at Unit 11 • Units 11–30 daily life • Grammar • Vocabulary pages • Listening / reading practice',
@@ -438,7 +536,7 @@ class _HomePageState extends State<HomePage> {
         ),
         const SizedBox(height: 12),
         _pathCard(
-          icon: '🔴', badge: 'EXPERT / HARD', badgeColor: const Color(0xFFC62828),
+          icon: Icons.workspace_premium, badge: 'EXPERT / HARD', badgeColor: AppColors.red,
           title: 'Expert — Test-ready',
           desc: 'You are aiming at the 82.5/100 merit, not just the 60 pass.',
           includes: 'Units 31–60 workplace Korean • Safety signs, laws & insurance • Skill Test tasks • Expert Mock (40q / 50 min / 100) • Analytics',
@@ -454,9 +552,9 @@ class _HomePageState extends State<HomePage> {
         // Transfers / Request / Pay row under its balance header.
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
           _quickAction(Icons.school, _navy, t(lang, 'learn'), () => widget.onGo(1, 'Learn')),
-          _quickAction(Icons.mic, _green, t(lang, 'tutor'), () => widget.onGo(4, 'Tutor')),
-          _quickAction(Icons.timer, const Color(0xFFC62828), t(lang, 'mock'), () => widget.onGo(3, 'Mock')),
-          _quickAction(Icons.videogame_asset, const Color(0xFF6A1B9A), t(lang, 'games'), () => widget.onGo(5, 'Games')),
+          _quickAction(Icons.mic, _green, t(lang, 'tutor'), () => widget.onGo(3, 'Tutor')),
+          _quickAction(Icons.timer, AppColors.red, t(lang, 'mock'), () => widget.onGo(2, 'Mock')),
+          _quickAction(Icons.videogame_asset, AppColors.purple, 'Games', () => widget.onGo(4, 'More')),
         ]),
         const SizedBox(height: 20),
         // TODAY — the only plan on Home; the full 12-week plan lives in Learn.
@@ -465,10 +563,10 @@ class _HomePageState extends State<HomePage> {
           Text(week[1], style: const TextStyle(fontSize: 15, color: _ink)),
           const SizedBox(height: 10),
           TextButton.icon(
-            onPressed: widget.onStart,
+            onPressed: () => widget.onGo(1, 'Learn'),
             icon: const Icon(Icons.play_arrow, size: 18),
-            label: const Text('Start today\'s lesson  •  30 min', style: TextStyle(color: _green, fontWeight: FontWeight.bold)),
-            style: TextButton.styleFrom(padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
+            label: const Text('View in Learn  •  30 min', style: TextStyle(color: AppColors.greenDark, fontWeight: FontWeight.bold)),
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, alignment: Alignment.centerLeft, minimumSize: const Size(48, 48)),
           ),
         ]),
         const SizedBox(height: 14),
@@ -481,9 +579,9 @@ class _HomePageState extends State<HomePage> {
           Wrap(spacing: 8, runSpacing: 8, children: [
             for (final s in tutorStarters.take(3))
               ActionChip(
-                label: Text(s[1], style: const TextStyle(fontSize: 13)),
+                label: Text(s[1], style: const TextStyle(fontSize: 14)),
                 backgroundColor: const Color(0xFFE8F5E9),
-                onPressed: () => widget.onGo(4, 'Tutor'),
+                onPressed: () => widget.onGo(3, 'Tutor'),
               ),
           ]),
         ]),
@@ -492,14 +590,14 @@ class _HomePageState extends State<HomePage> {
         _card(children: [
           _cardHead('📝', 'Mock Test — Basic & Expert'),
           const Text('40 questions  •  50 min  •  100 points', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _ink)),
-          const Text('Pass 60  •  Pakistan 2026 merit 82.5', style: TextStyle(fontSize: 13, color: _muted)),
+          const Text('Pass 60  •  Pakistan 2026 merit 82.5', style: TextStyle(fontSize: 14, color: _muted)),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: _navy, minimumSize: const Size.fromHeight(48)),
-              onPressed: () => widget.onGo(3, 'Mock'),
-              child: const Text('Start mock test', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(minimumSize: const Size.fromHeight(48)),
+              onPressed: () => widget.onGo(2, 'Mock'),
+              child: const Text('Open Mock Test', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.navy)),
             ),
           ),
         ]),
@@ -517,22 +615,22 @@ class _HomePageState extends State<HomePage> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
           child: Column(children: [
             _exploreRow(Icons.school, _navy, t(lang, 'learn'), 'Hangul • Vocabulary • Units 0–60', () => widget.onGo(1, 'Learn')),
-            _exploreRow(Icons.edit, _green, t(lang, 'practice'), 'Speak Test • Games • Notebook', () => widget.onGo(2, 'Practice')),
-            _exploreRow(Icons.timer, const Color(0xFFC62828), t(lang, 'mock'), 'Basic & Expert • Results & analytics', () => widget.onGo(3, 'Mock')),
-            _exploreRow(Icons.public, const Color(0xFF00897B), 'Life in Korea', 'Skill Test • Culture • Rights • Documents', () => widget.onGo(1, 'Learn')),
-            _exploreRow(Icons.settings, _muted, t(lang, 'settings'), 'Language • Account • Sound • Help', () => widget.onGo(6, 'Settings'), last: true),
+            _exploreRow(Icons.edit, _green, t(lang, 'practice'), 'Speak Test • Games • Notebook', () => widget.onGo(4, 'More')),
+            _exploreRow(Icons.timer, AppColors.red, t(lang, 'mock'), 'Basic & Expert • Results & analytics', () => widget.onGo(2, 'Mock')),
+            _exploreRow(Icons.public, AppColors.tealDark, 'Life in Korea', 'Skill Test • Culture • Rights • Documents', () => widget.onLearnSection('life')),
+            _exploreRow(Icons.settings, _muted, t(lang, 'settings'), 'Language • Account • Sound • Help', () => widget.onGo(4, 'More'), last: true),
           ]),
         ),
         const SizedBox(height: 14),
         const Text('Not affiliated with OEC or HRD Korea. Check the latest OEC notice at jobs.oec.gov.pk.',
-            textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: _muted)),
+            textAlign: TextAlign.center, style: TextStyle(fontSize: 14, color: _muted)),
       ]),
     );
   }
 
   Widget _stat(String value, String label) => Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+        Text(label, style: const TextStyle(fontSize: 14, color: Colors.white)),
       ]));
 
   Widget _quickAction(IconData icon, Color c, String label, VoidCallback onTap) => Expanded(child: InkWell(
@@ -545,7 +643,7 @@ class _HomePageState extends State<HomePage> {
             child: Icon(icon, color: c, size: 28),
           ),
           const SizedBox(height: 6),
-          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink)),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _ink)),
         ]),
       ));
 
@@ -564,7 +662,7 @@ class _HomePageState extends State<HomePage> {
         ]),
       );
 
-  Widget _pathCard({required String icon, required String badge, required Color badgeColor, required String title, required String desc, required String includes, required String focus, required String button, required bool isCurrent, required VoidCallback onTap, String? secondaryButton, VoidCallback? onSecondaryTap}) => Container(
+  Widget _pathCard({required IconData icon, required String badge, required Color badgeColor, required String title, required String desc, required String includes, required String focus, required String button, required bool isCurrent, required VoidCallback onTap, String? secondaryButton, VoidCallback? onSecondaryTap}) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -574,19 +672,19 @@ class _HomePageState extends State<HomePage> {
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Text(icon, style: const TextStyle(fontSize: 22)),
+            Icon(icon, color: badgeColor, size: 24),
             const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(8)),
-              child: Text(badge, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+              child: Text(badge, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
             ),
             const Spacer(),
             if (isCurrent)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(8)),
-                child: const Text('✓ Your path', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+                child: const Text('✓ Your path', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
               ),
           ]),
           const SizedBox(height: 8),
@@ -594,9 +692,9 @@ class _HomePageState extends State<HomePage> {
           const SizedBox(height: 2),
           Text(desc, style: const TextStyle(fontSize: 14, color: _muted)),
           const SizedBox(height: 8),
-          Text(includes, style: const TextStyle(fontSize: 13, color: _ink)),
+          Text(includes, style: const TextStyle(fontSize: 14, color: _ink)),
           const SizedBox(height: 6),
-          Text(focus, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _ink)),
+          Text(focus, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: _ink)),
           const SizedBox(height: 12),
           SizedBox(
             width: double.infinity,
@@ -629,7 +727,7 @@ class _HomePageState extends State<HomePage> {
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _ink)),
-              Text(sub, style: const TextStyle(fontSize: 12, color: _muted)),
+              Text(sub, style: const TextStyle(fontSize: 14, color: _muted)),
             ])),
             const Icon(Icons.arrow_forward_ios, size: 15, color: _muted),
           ]),
@@ -640,9 +738,11 @@ class _HomePageState extends State<HomePage> {
 // ---------------- Learn ----------------
 class LearnPage extends StatefulWidget {
   /// v1.3.0 path entry point: 'basic' -> Hangul, 'mid' -> Unit 11,
-  /// 'expert' -> Unit 31. Null = normal Learn tab (Hangul).
+  /// 'expert' -> Unit 31, 'continue' -> startUnit, 'section:life' -> Life.
+  /// Null = normal Learn tab (Hangul).
   final String? start;
-  const LearnPage({super.key, this.start});
+  final int? startUnit;
+  const LearnPage({super.key, this.start, this.startUnit});
   @override
   State<LearnPage> createState() => _LearnPageState();
 }
@@ -654,8 +754,14 @@ class _LearnPageState extends State<LearnPage> {
     super.initState();
     if (widget.start == 'mid') { section = 'course'; selectedUnit = 11; }
     if (widget.start == 'expert') { section = 'course'; selectedUnit = 31; }
+    if (widget.start == 'continue' && widget.startUnit != null) { section = 'course'; selectedUnit = widget.startUnit; }
+    if (widget.start != null && widget.start!.startsWith('section:')) { section = widget.start!.substring(8); }
     // 'basic' (and null) stay on Hangul — the alphabet walk is the start.
   }
+
+  /// P0-1: Back from a Unit/Skill detail returns to the list, not Home.
+  bool get hasDetail => selectedUnit != null || selectedSkill != null;
+  void closeDetail() => setState(() { selectedUnit = null; selectedSkill = null; });
   int vowelIdx = 0, consIdx = 0, buildIdx = 0, buildStage = 0;
   int notebookStep = 0;
   int vocabPage = 0;
@@ -694,7 +800,7 @@ class _LearnPageState extends State<LearnPage> {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('1) Full alphabets first — like A B C D', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
       const Text('Tap a letter to hear it. Vowels first, then consonants.'),
-      const Text('✍️ Stroke order: always write top to bottom, left to right. One syllable = one block (e.g. ㅎ + ㅏ + ㄴ = 한). Trace the big letter in the air, then write it 5 times in your notebook.', style: TextStyle(fontSize: 13, color: Colors.grey)),
+      const Text('✍️ Stroke order: always write top to bottom, left to right. One syllable = one block (e.g. ㅎ + ㅏ + ㄴ = 한). Trace the big letter in the air, then write it 5 times in your notebook.', style: TextStyle(fontSize: 14, color: AppColors.muted)),
       const SizedBox(height: 8),
       Text('Vowels — Letter ${vowelIdx + 1} of 21', style: const TextStyle(fontWeight: FontWeight.bold)),
       Row(children: [
@@ -790,6 +896,18 @@ class _LearnPageState extends State<LearnPage> {
         const Text('✏️ Notebook task: write the 5 words above 5 times each, then write one sentence of your own. Tap “I wrote it” in Notebook Time when you finish.', style: TextStyle(fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         ElevatedButton(onPressed: () => speakSlowThenNormal(u.ko), child: const Text('🔊 Hear the unit title in Korean')),
+        const SizedBox(height: 12),
+        SizedBox(
+          width: double.infinity,
+          child: ElevatedButton(
+            style: primaryButtonStyle(),
+            onPressed: () async {
+              await AppStore.I.setDone('unit_${u.n}', true);
+              setState(() { selectedUnit = u.n < 60 ? u.n + 1 : null; });
+            },
+            child: Text(u.n < 60 ? '✓ Mark done & Next unit →' : '✓ Mark done — course finished'),
+          ),
+        ),
       ]);
     }
     return Column(children: [
@@ -872,13 +990,14 @@ class _LearnPageState extends State<LearnPage> {
   }
 
   Widget _life() {
-    return const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Text('Life and Work in Korea', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
       SizedBox(height: 8),
       Text('• Work: factory, farm and other E-9 workplaces. Normal day, working hours, breaks, safety gear. Winter is cold, summer is hot and humid.\n• Labour rights: minimum wage 2026 is 10,320 KRW per hour. Overtime pay, weekly rest day, paid holidays, contract, salary paid on time. Nobody may take your passport. You may change workplace in allowed cases. You may complain.\n• Safety: safety signs, PPE (helmet, gloves, goggles), what to do if hurt — tell your boss, call 119.\n• Help: employer, OEC, HRD Korea EPS Center, Korean labour helpline 1350, emergency 119. Do not pay any agent.\n• Life: housing (dormitory), food, transport, weather, manners at work, bank account.\n• Do NOT: do not overstay, do not work outside your allowed job, do not trust agents who promise a job for money.\n• Based on Units 57–60: EPS System, Labor Standards Act, Immigration Act, Worker Insurance. Check the latest OEC / HRD Korea notice — rules can change. jobs.oec.gov.pk'),
       SizedBox(height: 12),
       Text('Korean culture & manners', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       SizedBox(height: 6),
+      ...cultureLessons.map((c) => Card(child: Padding(padding: EdgeInsets.all(12), child: Row(children: [Icon(Icons.check_circle, color: AppColors.greenDark, size: 20), SizedBox(width: 8), Expanded(child: Text(c, style: TextStyle(fontSize: 14, color: AppColors.ink)))])))),
     ]);
   }
 
@@ -945,18 +1064,46 @@ class PracticePage extends StatefulWidget {
 }
 
 class _PracticePageState extends State<PracticePage> {
-  int q = 0, score = 0, tries = 0, step = 0;
+  int q = 0, score = 0, tries = 0, step = 0, maxStep = 0;
   String feedback = '';
   String heardText = '';
   bool done = false;
+  bool listeningMic = false;
+  // Tap options, shuffled ONCE per round in state (P0-4) — never in build().
+  List<List<String>> tapOptions = [];
 
-  // Honest similarity: Hangul exact/contains, or edit distance <= 1-2.
+  @override
+  void initState() {
+    super.initState();
+    _regenTapOptions();
+  }
+
+  void _regenTapOptions() {
+    final w = vocab[q % vocab.length];
+    final rnd = Random();
+    final others = <List<String>>[];
+    final used = {q % vocab.length};
+    while (others.length < 3) {
+      final i = rnd.nextInt(vocab.length);
+      if (used.add(i)) others.add(vocab[i]);
+    }
+    tapOptions = [w, ...others]..shuffle(rnd);
+  }
+
+  void _advanceStep(int s) {
+    setState(() {
+      step = s;
+      if (s > maxStep) maxStep = s;
+    });
+  }
+
+  // Honest similarity (P0-4): exact match or Levenshtein <= 1-2 ONLY.
+  // The old contains() shortcut let "물" pass for "물 주세요" — removed.
   bool _isClose(String heard, String target) {
     String norm(String x) => x.replaceAll(RegExp(r'[\s\.\?\!]+'), '').trim();
     final h = norm(heard), t = norm(target);
     if (h.isEmpty) return false;
-    if (h == t || h.contains(t) || t.contains(h)) return true;
-    // Levenshtein distance, small allowance for short words.
+    if (h == t) return true;
     int dist(String a, String b) {
       final d = List.generate(a.length + 1, (i) => List.generate(b.length + 1, (j) => i == 0 ? j : (j == 0 ? i : 0)));
       for (var i = 1; i <= a.length; i++) {
@@ -974,13 +1121,18 @@ class _PracticePageState extends State<PracticePage> {
     final w = vocab[q % vocab.length];
     const steps = ['1. Listen', '2. Repeat', '3. Speak on mic', '4. Honest result', '5. Listen again'];
     return ListView(padding: const EdgeInsets.all(16), children: [
-      const Text('Practice — Speak Test', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF0B2C6B))),
+      const Text('Practice — Speak Test', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: AppColors.navy)),
       const Text('How to practise, like a teacher teaches it. Follow the steps in order — do not skip Step 1.'),
       const SizedBox(height: 10),
+      // Locked sequence (P0-4): future steps are not tappable.
+      LinearProgressIndicator(value: (step + 1) / 5, minHeight: 8, backgroundColor: AppColors.border, valueColor: const AlwaysStoppedAnimation(AppColors.greenDark)),
+      const SizedBox(height: 8),
+      Text('Step ${step + 1} of 5 — ${steps[step].substring(3)}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.ink)),
+      const SizedBox(height: 8),
       Wrap(spacing: 6, children: steps.asMap().entries.map((e) => ChoiceChip(
-        label: Text(e.value, style: const TextStyle(fontSize: 12)),
+        label: Text(e.value, style: const TextStyle(fontSize: 14)),
         selected: step == e.key,
-        onSelected: (_) => setState(() => step = e.key),
+        onSelected: e.key <= maxStep ? (_) => setState(() => step = e.key) : null,
       )).toList()),
       const SizedBox(height: 10),
       Card(
@@ -1000,35 +1152,53 @@ class _PracticePageState extends State<PracticePage> {
         Text('${w[1]} — ${w[2]} (${w[3]})'),
         const SizedBox(height: 10),
         Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          ElevatedButton(onPressed: () { setState(() => step = 1); speakSlowThenNormal(w[0]); }, child: const Text('🔊 Listen')),
+          ElevatedButton(onPressed: () { _advanceStep(1); speakSlowThenNormal(w[0]); }, child: const Text('🔊 Listen')),
           const SizedBox(width: 8),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF6C00)),
-            onPressed: () { setState(() => step = 2); _speakTest(w[0]); },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.orangeDark),
+            onPressed: () { _advanceStep(2); _speakTest(w[0]); },
             child: const Text('🎤 Speak on mic'),
           ),
         ]),
+        // Listening indicator (P0-4): visible state while the mic is live.
+        if (listeningMic) Padding(
+          padding: const EdgeInsets.only(top: 12),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: const [
+            Icon(Icons.mic, color: AppColors.red, size: 24),
+            SizedBox(width: 8),
+            Text('Listening… say it now, clearly, once.', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.red)),
+          ]),
+        ),
         const SizedBox(height: 8),
         const Text('Or tap the word you heard:'),
-        Wrap(spacing: 8, children: vocab.sublist(0, 4).map((v) => ElevatedButton(
-          onPressed: () { setState(() => step = 3); _answer(v[0] == w[0], w[0]); },
+        Wrap(spacing: 8, children: tapOptions.map((v) => ElevatedButton(
+          onPressed: () { _advanceStep(3); _answer(v[0] == w[0], w[0]); },
           child: Text(v[0]),
         )).toList()),
-        if (heardText.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text('You said: $heardText', style: const TextStyle(fontSize: 14, color: Colors.grey))),
+        if (heardText.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 8), child: Text('You said: $heardText', style: const TextStyle(fontSize: 14, color: AppColors.muted))),
+        if (heardText.isNotEmpty && heardText != '(nothing heard)')
+          Padding(padding: const EdgeInsets.only(top: 6), child: TextButton.icon(
+            icon: const Icon(Icons.replay, size: 18),
+            label: const Text('Hear what you said', style: TextStyle(fontSize: 14)),
+            onPressed: () => speakSlowThenNormal(heardText),
+          )),
+        if (heardText.isNotEmpty) const Padding(padding: EdgeInsets.only(top: 2), child: Text('(Replayed by TTS from the recognised text — not a recording of your voice.)', style: TextStyle(fontSize: 14, color: AppColors.muted))),
         if (feedback.isNotEmpty) Padding(padding: const EdgeInsets.only(top: 10), child: Text(feedback, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
         if (done) Padding(padding: const EdgeInsets.only(top: 8), child: Text('Score: $score correct. ${score >= 3 ? "Wah bhai wah, Korea pakka!" : "Ghalat jawab, lekin himmat na haar, dobara kar!"}')),
-        if (tries >= 3) TextButton(onPressed: () { setState(() { tries = 0; feedback = ''; step = 0; }); }, child: const Text('📚 Learn Again — back to this lesson')),
+        if (tries >= 3) TextButton(onPressed: () { setState(() { tries = 0; feedback = ''; step = 0; maxStep = 0; }); }, child: const Text('📚 Learn Again — back to this lesson')),
       ]))),
       const SizedBox(height: 14),
-      const Text('🇰🇷 Culture & manners — real situations', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF0B2C6B))),
+      const Text('Culture & manners — real situations', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.navy)),
       const Text('Tap a situation to see what to do, what NOT to do, and the Korean words to say.'),
       const SizedBox(height: 8),
       ...cultureScenarios.map((c) => Card(child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text(c[0], style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        Text('🎬 Situation: ${c[1]}'),
-        Text('✅ Do: ${c[2]}', style: const TextStyle(color: Colors.green)),
-        Text('❌ Do NOT: ${c[3]}', style: const TextStyle(color: Colors.red)),
+        Text('Situation: ${c[1]}'),
+        Row(children: const [Icon(Icons.check_circle, color: AppColors.greenDark, size: 18), SizedBox(width: 6), Text('Do:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))]),
+        Text(c[2], style: const TextStyle(color: AppColors.greenDark, fontSize: 14)),
+        Row(children: const [Icon(Icons.cancel, color: AppColors.red, size: 18), SizedBox(width: 6), Text('Do NOT:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14))]),
+        Text(c[3], style: const TextStyle(color: AppColors.red, fontSize: 14)),
         const SizedBox(height: 6),
         Container(padding: const EdgeInsets.all(10), decoration: BoxDecoration(color: const Color(0xFFE8F5F3), borderRadius: BorderRadius.circular(10)), child: Row(children: [
           Expanded(child: Text('${c[4]} (${c[5]}) — ${c[6]}', style: const TextStyle(fontWeight: FontWeight.bold))),
@@ -1041,11 +1211,13 @@ class _PracticePageState extends State<PracticePage> {
   void _answer(bool correct, String target) {
     setState(() {
       step = 3;
+      if (step > maxStep) maxStep = 3;
       if (correct) {
         score++;
         feedback = 'Very good! ⭐ $target — correct.';
         q++;
         tries = 0;
+        _regenTapOptions();
         if (q >= 5) done = true;
       } else {
         tries++;
@@ -1061,18 +1233,18 @@ class _PracticePageState extends State<PracticePage> {
     final stt = SpeechToText();
     try {
       final ok = await stt.initialize();
-      if (!ok) { setState(() => feedback = 'Mic / speech recognition is not available on this phone. Use Listen-and-Tap instead — the test is never blocked.'); return; }
-      setState(() { feedback = 'Listening… say it now, clearly, once.'; heardText = ''; });
+      if (!ok) { setState(() { listeningMic = false; feedback = 'Mic / speech recognition is not available on this phone. Use Listen-and-Tap instead — the test is never blocked.'; }); return; }
+      setState(() { listeningMic = true; feedback = 'Listening… say it now, clearly, once.'; heardText = ''; });
       await stt.listen(onResult: (r) {
         if (r.finalResult) {
           final heard = r.recognizedWords;
-          setState(() => heardText = heard.isEmpty ? '(nothing heard)' : heard);
+          setState(() { listeningMic = false; heardText = heard.isEmpty ? '(nothing heard)' : heard; });
           _answer(_isClose(heard, target), target);
           stt.stop();
         }
       }, localeId: 'ko-KR');
     } catch (_) {
-      setState(() => feedback = 'Mic not available. Use Listen-and-Tap instead.');
+      setState(() { listeningMic = false; feedback = 'Mic not available. Use Listen-and-Tap instead.'; });
     }
   }
 }
@@ -1081,14 +1253,15 @@ class _PracticePageState extends State<PracticePage> {
 class MockPage extends StatefulWidget {
   /// v1.3.0: Expert path can open Mock with 'expert' pre-selected.
   final String initialDifficulty;
-  const MockPage({super.key, this.initialDifficulty = 'basic'});
+  final VoidCallback? onGoLearn;
+  const MockPage({super.key, this.initialDifficulty = 'basic', this.onGoLearn});
   @override
   State<MockPage> createState() => _MockPageState();
 }
 
 class _MockPageState extends State<MockPage> {
   int qi = 0, listening = 0, reading = 0;
-  bool started = false, finished = false;
+  bool started = false, finished = false, paused = false;
   String difficulty = 'basic';
   @override
   void initState() {
@@ -1096,78 +1269,97 @@ class _MockPageState extends State<MockPage> {
     difficulty = widget.initialDifficulty;
   }
   int secondsLeft = 50 * 60;
+  // P0-2: palette + flag + per-question answers.
+  final Set<int> flagged = {};
+  final List<int> answers = List<int>.filled(40, -1);
+  bool showPalette = false;
+  int? selectedIdx;
+  bool answered = false;
+  // Listening: plays per question (auto-play counts as 1, max 2 total).
+  final Map<int, int> listeningPlays = {};
+  int autoPlayedQi = -1;
 
-  /// Shuffled options for question qi: correct + 3 wrong, position randomised.
   List<String> _options(String correct, List<String> wrongs, int seed) {
     final opts = <String>[correct, ...wrongs]..shuffle(Random(seed));
     return opts;
   }
 
+  int get _timeUsed => 50 * 60 - secondsLeft;
+
   @override
   Widget build(BuildContext context) {
     if (!started) {
+      final mocks = (AppStore.I.progress['mocks'] as List? ?? []);
       return ListView(padding: const EdgeInsets.all(16), children: [
-        const Text('Mock Test — 40 questions, 50 minutes, 100 points', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Color(0xFF0B2C6B))),
+        const Text('Mock Test — 40 questions, 50 minutes, 100 points', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: AppColors.navy)),
         const Text('20 reading + 20 listening. Passing floor 60/100. Pakistan 2026 merit 82.5/100 (reported — check the latest OEC notice).'),
         const SizedBox(height: 12),
         const Text('Choose your difficulty:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
         const SizedBox(height: 8),
         Card(color: difficulty == 'basic' ? const Color(0xFFE8F5E9) : Colors.white, child: ListTile(
-          leading: const Text('🟢', style: TextStyle(fontSize: 24)),
+          leading: const Icon(Icons.check_circle_outline, color: AppColors.greenDark, size: 28),
           title: const Text('Basic — for beginners', style: TextStyle(fontWeight: FontWeight.bold)),
           subtitle: const Text('Easy words and short questions. Learn the format, build confidence.'),
-          trailing: difficulty == 'basic' ? const Icon(Icons.check_circle, color: Colors.green) : null,
+          trailing: difficulty == 'basic' ? const Icon(Icons.check_circle, color: AppColors.greenDark) : null,
           onTap: () => setState(() => difficulty = 'basic'),
         )),
         Card(color: difficulty == 'expert' ? const Color(0xFFFFEBEE) : Colors.white, child: ListTile(
-          leading: const Text('🔴', style: TextStyle(fontSize: 24)),
+          leading: const Icon(Icons.workspace_premium, color: AppColors.red, size: 28),
           title: const Text('Expert — real test level', style: TextStyle(fontWeight: FontWeight.bold)),
           subtitle: const Text('Harder, longer, real EPS-TOPIK style reading and listening from the new syllabus (Units 1–60, safety, laws). Aiming at the 82.5/100 merit, not just the 60 pass floor.'),
-          trailing: difficulty == 'expert' ? const Icon(Icons.check_circle, color: Colors.red) : null,
+          trailing: difficulty == 'expert' ? const Icon(Icons.check_circle, color: AppColors.red) : null,
           onTap: () => setState(() => difficulty = 'expert'),
         )),
         const SizedBox(height: 12),
         ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF6C00), minimumSize: const Size.fromHeight(52)),
+          style: primaryButtonStyle(bg: AppColors.orangeDark),
           onPressed: () => setState(() { started = true; _tick(); }),
           child: Text('Start ${difficulty == 'expert' ? 'Expert' : 'Basic'} mock (50 min)', style: const TextStyle(fontSize: 16)),
         ),
         const SizedBox(height: 12),
-        const Text('Your past attempts:'),
-        ...((AppStore.I.progress['mocks'] as List? ?? []).map((m) => ListTile(
+        const Text('Your past attempts:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+        if (mocks.isEmpty)
+          const Padding(padding: EdgeInsets.only(top: 8), child: Text('No mock attempts yet — take your first mock above.', style: TextStyle(fontSize: 14, color: AppColors.muted))),
+        ...mocks.map((m) => ListTile(
           title: Text('Listening ${m['l']}/20 • Reading ${m['r']}/20'),
-          subtitle: Text('Score ${(m['l'] + m['r']) * 2.5}/100 — ${((m['l'] + m['r']) * 2.5) >= 60 ? 'Passed (60)' : 'Below passing'} • ${((m['l'] + m['r']) * 2.5) >= 82.5 ? 'Above merit 82.5' : 'Below merit 82.5'}'),
-        ))),
+          subtitle: Text('${(m['d'] ?? 'basic') == 'expert' ? 'Expert' : 'Basic'} • ${(m['date'] ?? '').toString().substring(0, 10)} • Score ${(m['l'] + m['r']) * 2.5}/100 — ${((m['l'] + m['r']) * 2.5) >= 60 ? 'Passed (60)' : 'Below passing'} • ${((m['l'] + m['r']) * 2.5) >= 82.5 ? 'Above merit 82.5' : 'Below merit 82.5'}${m['secs'] != null ? ' • Time ${formatMmSs(m['secs'] as int)}' : ''}'),
+        )),
       ]);
     }
     if (finished) {
       final total = (listening + reading) * 2.5;
-      return Center(child: Padding(padding: const EdgeInsets.all(20), child: Column(mainAxisSize: MainAxisSize.min, children: [
+      final weakListening = listening <= reading;
+      return Center(child: Padding(padding: const EdgeInsets.all(20), child: ListView(shrinkWrap: true, children: [
         Text('Result: $total / 100', style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
         Text('Listening $listening/20 • Reading $reading/20'),
+        const SizedBox(height: 12),
+        _resultBar('Listening', listening * 5),
+        _resultBar('Reading', reading * 5),
         const SizedBox(height: 8),
-        Text('📊 Analytics: Listening ${(listening * 5)}%  •  Reading ${(reading * 5)}%  •  Pass line 60  •  Merit line 82.5'),
-        Text(listening <= reading
+        Text('Analytics: Listening ${listening * 5}%  •  Reading ${reading * 5}%  •  Pass line 60  •  Merit line 82.5'),
+        Text(weakListening
             ? 'Weak area: Listening — do 10 minutes of Listen-and-Tap every day before your next mock.'
             : 'Weak area: Reading — re-read Units 1–30 slowly, then try the Expert mock again.',
             textAlign: TextAlign.center),
-        Text('Time used: ${50 * 60 - secondsLeft} seconds of 50 minutes. In the real CBT test the clock never stops — finish each question in about 75 seconds.', textAlign: TextAlign.center, style: const TextStyle(fontSize: 13, color: Colors.grey)),
+        Text('Time used: ${formatMmSs(_timeUsed)} of 50 minutes. In the real CBT test the clock never stops — finish each question in about 75 seconds.', textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, color: AppColors.muted)),
         Text('${difficulty == 'expert' ? 'Expert' : 'Basic'} mock', style: const TextStyle(fontWeight: FontWeight.bold)),
         Text(total >= 82.5 ? 'Wah bhai wah, Korea pakka! Above merit.' : total >= 60 ? 'Passed the floor (60), but below merit 82.5 — practise your weak topics.' : 'Ghalat jawab, lekin himmat na haar, dobara kar! Below 60 — learn again.'),
         const SizedBox(height: 12),
-        ElevatedButton(onPressed: () => setState(() { started = false; finished = false; qi = 0; listening = 0; reading = 0; secondsLeft = 50 * 60; }), child: const Text('Back')),
+        if (widget.onGoLearn != null)
+          OutlinedButton(onPressed: widget.onGoLearn, child: Text(weakListening ? 'Practise Listening in Learn →' : 'Practise Reading in Learn →')),
+        const SizedBox(height: 8),
+        ElevatedButton(onPressed: () => setState(() { started = false; finished = false; qi = 0; listening = 0; reading = 0; secondsLeft = 50 * 60; answers.fillRange(0, 40, -1); flagged.clear(); selectedIdx = null; answered = false; listeningPlays.clear(); autoPlayedQi = -1; }), child: const Text('Back')),
       ])));
     }
     final isListening = qi < 20;
     final isExpert = difficulty == 'expert';
-    // Correct answer text + 3 wrong texts, shuffled with a per-question seed
-    // so the correct position varies across A–D and is never predictable.
     late String prompt, promptKo;
     late List<String> options;
     late String correctText;
     if (isExpert) {
+      // P0-2: 40 UNIQUE questions — bank[qi] directly, never bank[qi % 20].
       final bank = isListening ? expertListening : expertReading;
-      final e = bank[qi % bank.length];
+      final e = bank[isListening ? qi : qi - 20];
       promptKo = e[0];
       prompt = isListening ? 'Listen, then tap the correct meaning:' : 'Read the sentence, then tap the correct meaning:';
       correctText = e[1];
@@ -1181,41 +1373,157 @@ class _MockPageState extends State<MockPage> {
           .map((v) => '${v[2]} — ${v[3]}').toList();
       options = _options(correctText, wrongs, 12345 + qi * 31);
     }
+    // P0-2: listening auto-plays ONCE when the question first shows.
+    if (isListening && autoPlayedQi != qi) {
+      autoPlayedQi = qi;
+      listeningPlays[qi] = 1;
+      WidgetsBinding.instance.addPostFrameCallback((_) => speak(promptKo));
+    }
+    final plays = listeningPlays[qi] ?? 0;
     const letters = ['A', 'B', 'C', 'D'];
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      Text('⏱ ${secondsLeft ~/ 60}:${(secondsLeft % 60).toString().padLeft(2, '0')} left — ${isExpert ? 'Expert' : 'Basic'} — Question ${qi + 1}/40 (${isListening ? 'Listening' : 'Reading'})',
-          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 12),
-      Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
-        Text(prompt, style: const TextStyle(fontSize: 16)),
-        Text(promptKo, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-        if (isListening) ElevatedButton(onPressed: () => speak(promptKo), child: const Text('🔊 Hear it')),
-        const SizedBox(height: 12),
-        ...options.asMap().entries.map((e) {
-          final idx = e.key, opt = e.value;
-          return Padding(padding: const EdgeInsets.only(bottom: 8), child: SizedBox(width: double.infinity, child: ElevatedButton(
-            onPressed: () async {
-              if (opt == correctText) { if (isListening) { listening++; } else { reading++; } }
-              if (qi + 1 >= 40) {
-                await AppStore.I.addMock(listening, reading);
-                setState(() => finished = true);
-              } else { setState(() => qi++); }
+    return Scaffold(
+      body: ListView(padding: const EdgeInsets.all(16), children: [
+        Row(children: [
+          Expanded(child: Text('⏱ ${formatMmSs(secondsLeft)} left — ${isExpert ? 'Expert' : 'Basic'} — Question ${qi + 1}/40 (${isListening ? 'Listening' : 'Reading'})',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+          IconButton(icon: Icon(paused ? Icons.play_arrow : Icons.pause, color: AppColors.navy), tooltip: paused ? 'Resume' : 'Pause', onPressed: () => setState(() => paused = !paused)),
+          IconButton(icon: const Icon(Icons.exit_to_app, color: AppColors.red), tooltip: 'Exit mock', onPressed: _confirmExit),
+        ]),
+        if (paused)
+          const Card(color: Color(0xFFFFF3E0), child: Padding(padding: EdgeInsets.all(14), child: Text('Paused — the clock is stopped. Tap Resume (top right) to continue.', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)))),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: OutlinedButton.icon(icon: const Icon(Icons.grid_view, size: 18), label: Text(showPalette ? 'Hide palette' : 'Question palette', style: const TextStyle(fontSize: 14)), onPressed: () => setState(() => showPalette = !showPalette))),
+          const SizedBox(width: 8),
+          Expanded(child: OutlinedButton.icon(
+            icon: Icon(flagged.contains(qi) ? Icons.flag : Icons.flag_outlined, size: 18, color: flagged.contains(qi) ? AppColors.orangeDark : AppColors.muted),
+            label: Text(flagged.contains(qi) ? 'Flagged — review later' : 'Flag for review', style: const TextStyle(fontSize: 14)),
+            onPressed: () => setState(() { flagged.contains(qi) ? flagged.remove(qi) : flagged.add(qi); }),
+          )),
+        ]),
+        if (showPalette) ...[
+          const SizedBox(height: 10),
+          GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 8, mainAxisSpacing: 6, crossAxisSpacing: 6, childAspectRatio: 1),
+            itemCount: 40,
+            itemBuilder: (_, i) {
+              final isCurrent = i == qi;
+              final isAnswered = answers[i] != -1;
+              final isFlagged = flagged.contains(i);
+              return InkWell(
+                onTap: () => setState(() { qi = i; selectedIdx = answers[i] == -1 ? null : answers[i]; answered = answers[i] != -1; }),
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: isAnswered ? AppColors.navy : Colors.white,
+                    border: Border.all(color: isCurrent ? AppColors.orangeDark : AppColors.border, width: isCurrent ? 2 : 1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Center(child: Text('${i + 1}${isFlagged ? '⚑' : ''}', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: isAnswered ? Colors.white : AppColors.ink))),
+                ),
+              );
             },
-            child: Text('${letters[idx]}. $opt'),
-          )));
-        }),
-      ]))),
-    ]);
+          ),
+        ],
+        const SizedBox(height: 12),
+        Card(child: Padding(padding: const EdgeInsets.all(16), child: Column(children: [
+          Text(prompt, style: const TextStyle(fontSize: 16)),
+          const SizedBox(height: 8),
+          if (isListening) ...[
+            // P0-2: audio-only listening — Korean text hidden until answered.
+            if (!answered)
+              const Text('Korean text hidden — listen carefully.', style: TextStyle(fontSize: 14, fontStyle: FontStyle.italic, color: AppColors.muted)),
+            if (answered) Text(promptKo, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: plays < 2 ? () { setState(() => listeningPlays[qi] = plays + 1); speak(promptKo); } : null,
+              child: Text(plays == 0 ? '🔊 Hear it' : plays == 1 ? '🔊 Hear again (1 replay left)' : '🔊 No replays left'),
+            ),
+          ] else
+            Text(promptKo, style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 12),
+          ...options.asMap().entries.map((e) {
+            final idx = e.key, opt = e.value;
+            final isSelected = selectedIdx == idx;
+            final isCorrect = opt == correctText;
+            Color? bg;
+            if (answered && isSelected) bg = isCorrect ? AppColors.greenDark : AppColors.red;
+            if (answered && isCorrect) bg = AppColors.greenDark;
+            return Padding(padding: const EdgeInsets.only(bottom: 8), child: SizedBox(width: double.infinity, child: ElevatedButton(
+              style: bg != null ? ElevatedButton.styleFrom(backgroundColor: bg, minimumSize: const Size.fromHeight(52)) : null,
+              onPressed: answered ? null : () {
+                setState(() {
+                  selectedIdx = idx;
+                  answered = true;
+                  answers[qi] = idx;
+                  if (opt == correctText) { if (isListening) { listening++; } else { reading++; } }
+                });
+              },
+              child: Text('${letters[idx]}. $opt', style: const TextStyle(fontSize: 14)),
+            )));
+          }),
+          if (answered) ...[
+            const SizedBox(height: 8),
+            Text(selectedIdx != null && options[selectedIdx!] == correctText ? 'Correct! ✓' : 'Not correct — the right answer is: $correctText',
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.ink)),
+            const SizedBox(height: 10),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: primaryButtonStyle(),
+                onPressed: () async {
+                  if (qi + 1 >= 40) {
+                    await AppStore.I.addMock(listening, reading, difficulty: difficulty, secondsUsed: _timeUsed);
+                    setState(() => finished = true);
+                  } else {
+                    setState(() { qi++; selectedIdx = answers[qi] == -1 ? null : answers[qi]; answered = answers[qi] != -1; });
+                  }
+                },
+                child: Text(qi + 1 >= 40 ? 'Finish & see result' : 'Next question →'),
+              ),
+            ),
+          ],
+        ]))),
+      ]),
+    );
+  }
+
+  Widget _resultBar(String label, int pct) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('$label — $pct%', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          const SizedBox(height: 4),
+          LinearProgressIndicator(value: pct / 100, minHeight: 10, backgroundColor: AppColors.border, valueColor: const AlwaysStoppedAnimation(AppColors.navy)),
+        ]),
+      );
+
+  Future<void> _confirmExit() async {
+    final leave = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Exit the mock?'),
+        content: const Text('Your progress in this mock will be lost. This cannot be undone.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(ctx).pop(false), child: const Text('Stay')),
+          TextButton(onPressed: () => Navigator.of(ctx).pop(true), child: const Text('Exit mock', style: TextStyle(color: AppColors.red))),
+        ],
+      ),
+    );
+    if (leave == true) {
+      setState(() { started = false; finished = false; qi = 0; listening = 0; reading = 0; secondsLeft = 50 * 60; answers.fillRange(0, 40, -1); flagged.clear(); selectedIdx = null; answered = false; listeningPlays.clear(); autoPlayedQi = -1; });
+    }
   }
 
   void _tick() async {
     while (started && !finished && secondsLeft > 0) {
       await Future.delayed(const Duration(seconds: 1));
       if (!mounted) return;
+      if (paused) continue;
       setState(() => secondsLeft--);
     }
     if (started && secondsLeft <= 0 && !finished) {
-      await AppStore.I.addMock(listening, reading);
+      await AppStore.I.addMock(listening, reading, difficulty: difficulty, secondsUsed: _timeUsed);
       setState(() => finished = true);
     }
   }
@@ -1327,7 +1635,7 @@ class _TutorPageState extends State<TutorPage> {
         trailing: IconButton(icon: const Icon(Icons.volume_up), onPressed: () => speakSlowThenNormal(s[2])),
         onTap: () { qC.text = s[1]; ask(s[1]); },
       )),
-      const Text('Note: speech recognition depends on the phone — if your language is not supported on this phone, the app says so and typing always works. The tutor answers from its built-in question bank; if it does not know your question, it says so honestly instead of guessing.', style: TextStyle(fontSize: 12, color: Colors.grey)),
+      const Text('Note: speech recognition depends on the phone — if your language is not supported on this phone, the app says so and typing always works. The tutor answers from its built-in question bank; if it does not know your question, it says so honestly instead of guessing.', style: TextStyle(fontSize: 14, color: AppColors.muted)),
     ]);
   }
 }
@@ -1343,11 +1651,24 @@ class _GamesPageState extends State<GamesPage> {
   int round = 0, stars = 0;
   String msg = '';
   final rnd = Random();
+  // Options shuffled ONCE per round in state — never in build(), or the
+  // correct answer moves under the user's finger on every rebuild.
+  List<List<String>> gameOptions = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _regenOptions();
+  }
+
+  void _regenOptions() {
+    final w = vocab[round % vocab.length];
+    gameOptions = [w, vocab[(round + 5) % vocab.length], vocab[(round + 11) % vocab.length], vocab[(round + 17) % vocab.length]]..shuffle(rnd);
+  }
 
   @override
   Widget build(BuildContext context) {
     final w = vocab[round % vocab.length];
-    final options = [w, vocab[(round + 5) % vocab.length], vocab[(round + 11) % vocab.length], vocab[(round + 17) % vocab.length]]..shuffle(rnd);
     return ListView(padding: const EdgeInsets.all(16), children: [
       const Text('Games — play & learn', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
       Text('Listen and Tap — round ${round + 1}/8 • ⭐ $stars • No timer here, take your time.'),
@@ -1359,12 +1680,13 @@ class _GamesPageState extends State<GamesPage> {
         const SizedBox(height: 4),
         TextButton(onPressed: () => speakSlowThenNormal(w[0]), child: const Text('Repeat / Hear again')),
         const SizedBox(height: 8),
-        ...options.map((o) => Padding(padding: const EdgeInsets.only(bottom: 8), child: SizedBox(width: double.infinity, child: ElevatedButton(
+        ...gameOptions.map((o) => Padding(padding: const EdgeInsets.only(bottom: 8), child: SizedBox(width: double.infinity, child: ElevatedButton(
           onPressed: () {
             setState(() {
               if (o[0] == w[0]) { stars++; msg = 'Wah bhai wah, Korea pakka! ⭐'; round++; }
               else { msg = 'Ghalat jawab, lekin himmat na haar, dobara kar!'; }
               if (round >= 8) { msg += ' Game finished — $stars/8 stars!'; round = 0; stars = 0; }
+              _regenOptions();
             });
           },
           child: Text('${o[0]} — ${o[2]}'),
@@ -1372,7 +1694,7 @@ class _GamesPageState extends State<GamesPage> {
         if (msg.isNotEmpty) Text(msg, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       ]))),
       const SizedBox(height: 12),
-      const Text('Daily Challenge: play Listen and Tap every day and keep your streak. Word Match and Memory Cards use the same words — tap a Korean word, then its meaning.'),
+      const Text('Daily Challenge: play Listen and Tap every day and keep your streak.'),
     ]);
   }
 }
@@ -1450,7 +1772,7 @@ class _SettingsPageState extends State<SettingsPage> {
         child: const Text('Delete account (needs current password above)'),
       ),
       const SizedBox(height: 8),
-      const Text('Help: if you are stuck, ask your teacher or message the app owner on WhatsApp. Version 1.0.0 (APK test build).', style: TextStyle(fontSize: 12, color: Colors.grey)),
+      const Text('Help: if you are stuck, ask your teacher or message the app owner on WhatsApp. Version 1.4.0 (APK test build).', style: TextStyle(fontSize: 14, color: AppColors.muted)),
     ]);
   }
 }
