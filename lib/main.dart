@@ -274,6 +274,13 @@ class _AuthScreenState extends State<AuthScreen> {
 }
 
 // ---------------- Home ----------------
+// CBD-inspired redesign (v1.2.0): Home shows ONLY the essentials, like a
+// bank app's dashboard — one hero "balance" card, one row of quick
+// actions, then Today / Tutor / Mock. Everything else lives in the
+// bottom tabs (Learn / Practice / Mock / Tutor / Games / Settings),
+// reached from the single "Explore" card. Nothing was deleted:
+// free promise, syllabus, merit, units, skill test, culture, life &
+// work, docs and the 12-week plan are all still in their tabs.
 class HomePage extends StatefulWidget {
   final void Function(int, String) onGo;
   final VoidCallback onStart;
@@ -283,6 +290,17 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  // CBD palette (from CBD's own promos / store listing): dark teal +
+  // lime green, with a green-to-lime "balance" header, white cards on a
+  // pale grey background, one accent per action, generous spacing.
+  static const _tealDark = Color(0xFF004D40);
+  static const _green = Color(0xFF00A859);
+  static const _lime = Color(0xFF8DC63F);
+  static const _navy = Color(0xFF0B2C6B);
+  static const _ink = Color(0xFF1A2B3C);
+  static const _muted = Color(0xFF5F6B7A);
+  static const _pageBg = Color(0xFFF3F5F7);
+
   @override
   Widget build(BuildContext context) {
     final lang = AppStore.I.lang;
@@ -290,120 +308,202 @@ class _HomePageState extends State<HomePage> {
     final words = (store.progress['words'] as Map? ?? {}).length;
     final days = (store.progress['days'] as List? ?? []).length;
     final mocks = (store.progress['mocks'] as List? ?? []).length;
-    final navy = const Color(0xFF0B2C6B);
-    final teal = const Color(0xFF00897B);
-    return ListView(padding: const EdgeInsets.all(16), children: [
-      // HERO — gradient, logo, progress
-      Container(
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [Color(0xFF0B2C6B), Color(0xFF1565C0), Color(0xFF00897B)], begin: Alignment.topLeft, end: Alignment.bottomRight),
-          borderRadius: BorderRadius.circular(20),
+    // Today's plan follows the 12-week plan: one week per 7 study days.
+    final weekIdx = ((days / 7).floor()).clamp(0, selfStudyPlan.length - 1);
+    final week = selfStudyPlan[weekIdx];
+    return Container(
+      color: _pageBg,
+      child: ListView(padding: const EdgeInsets.fromLTRB(16, 12, 16, 16), children: [
+        // HERO — the "balance" card: greeting, big Level figure, progress,
+        // three small stats, one primary action. (CBD shows the balance
+        // as one large white numeral in a green header.)
+        Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [_tealDark, _green, _lime],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [BoxShadow(color: _tealDark.withValues(alpha: 0.25), blurRadius: 16, offset: const Offset(0, 6))],
+          ),
+          padding: const EdgeInsets.all(20),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              ClipRRect(borderRadius: BorderRadius.circular(28), child: Image.asset('assets/logo.png', height: 56, width: 56, fit: BoxFit.cover)),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Salaam, ${store.currentName}', style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white)),
+                Text(store.isGuest ? 'Guest — on this phone only' : 'EPS TOPIK Pro Pakistan • Korea Pakka!',
+                    style: const TextStyle(fontSize: 12, color: Colors.white70)),
+              ])),
+            ]),
+            const SizedBox(height: 18),
+            Text('Level ${store.level}', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.bold, color: Colors.white, height: 1.0)),
+            const Text('of 5  •  your test-ready level', style: TextStyle(fontSize: 13, color: Colors.white70)),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: (store.level / 5).clamp(0.0, 1.0),
+                minHeight: 8,
+                backgroundColor: Colors.white30,
+                valueColor: const AlwaysStoppedAnimation(Colors.white),
+              ),
+            ),
+            const SizedBox(height: 14),
+            Row(children: [
+              _stat('$words', 'words'),
+              _stat('$days', 'study days'),
+              _stat('$mocks', 'mock tests'),
+            ]),
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: _tealDark,
+                  minimumSize: const Size.fromHeight(52),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                ),
+                onPressed: widget.onStart,
+                child: Text('▶  ${t(lang, 'startLearning')} — Lesson 1', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ]),
         ),
-        padding: const EdgeInsets.all(18),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            ClipRRect(borderRadius: BorderRadius.circular(12), child: Image.asset('assets/logo.png', height: 72, width: 72, fit: BoxFit.cover)),
+        const SizedBox(height: 20),
+        // QUICK ACTIONS — one row of 4 round actions, like CBD's
+        // Transfers / Request / Pay row under its balance header.
+        Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+          _quickAction(Icons.school, _navy, t(lang, 'learn'), () => widget.onGo(1, 'Learn')),
+          _quickAction(Icons.mic, _green, t(lang, 'tutor'), () => widget.onGo(4, 'Tutor')),
+          _quickAction(Icons.timer, const Color(0xFFC62828), t(lang, 'mock'), () => widget.onGo(3, 'Mock')),
+          _quickAction(Icons.videogame_asset, const Color(0xFF6A1B9A), t(lang, 'games'), () => widget.onGo(5, 'Games')),
+        ]),
+        const SizedBox(height: 20),
+        // TODAY — the only plan on Home; the full 12-week plan lives in Learn.
+        _card(children: [
+          _cardHead('📅', 'Today — ${week[0]}'),
+          Text(week[1], style: const TextStyle(fontSize: 15, color: _ink)),
+          const SizedBox(height: 10),
+          TextButton.icon(
+            onPressed: widget.onStart,
+            icon: const Icon(Icons.play_arrow, size: 18),
+            label: const Text('Start today\'s lesson  •  30 min', style: TextStyle(color: _green, fontWeight: FontWeight.bold)),
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, alignment: Alignment.centerLeft),
+          ),
+        ]),
+        const SizedBox(height: 14),
+        // TUTOR QUICK ASK — one tap on a starter question opens Tutor.
+        _card(children: [
+          _cardHead('🎤', t(lang, 'tutor')),
+          const Text('Ask in Pashto, Sindhi, Saraiki, Punjabi, Urdu or English — hear the Korean answer.',
+              style: TextStyle(fontSize: 14, color: _muted)),
+          const SizedBox(height: 10),
+          Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final s in tutorStarters.take(3))
+              ActionChip(
+                label: Text(s[1], style: const TextStyle(fontSize: 13)),
+                backgroundColor: const Color(0xFFE8F5E9),
+                onPressed: () => widget.onGo(4, 'Tutor'),
+              ),
+          ]),
+        ]),
+        const SizedBox(height: 14),
+        // MOCK QUICK START — pass / merit lines live here and in Mock.
+        _card(children: [
+          _cardHead('📝', 'Mock Test — Basic & Expert'),
+          const Text('40 questions  •  50 min  •  100 points', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: _ink)),
+          const Text('Pass 60  •  Pakistan 2026 merit 82.5', style: TextStyle(fontSize: 13, color: _muted)),
+          const SizedBox(height: 10),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: _navy, minimumSize: const Size.fromHeight(48)),
+              onPressed: () => widget.onGo(3, 'Mock'),
+              child: const Text('Start mock test', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 20),
+        // EXPLORE — everything else, one card, five rows, each to its tab.
+        // Learn holds Hangul, Vocabulary, Units 0–60, Skill Test, Culture,
+        // Life & Work, Emergency phrases, Docs and the 12-week plan;
+        // Practice holds Speak Test, Games and Notebook.
+        const Text('Explore', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _ink)),
+        const SizedBox(height: 8),
+        Card(
+          margin: EdgeInsets.zero,
+          elevation: 0,
+          color: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: Column(children: [
+            _exploreRow(Icons.school, _navy, t(lang, 'learn'), 'Hangul • Vocabulary • Units 0–60', () => widget.onGo(1, 'Learn')),
+            _exploreRow(Icons.edit, _green, t(lang, 'practice'), 'Speak Test • Games • Notebook', () => widget.onGo(2, 'Practice')),
+            _exploreRow(Icons.timer, const Color(0xFFC62828), t(lang, 'mock'), 'Basic & Expert • Results & analytics', () => widget.onGo(3, 'Mock')),
+            _exploreRow(Icons.public, const Color(0xFF00897B), 'Life in Korea', 'Skill Test • Culture • Rights • Documents', () => widget.onGo(1, 'Learn')),
+            _exploreRow(Icons.settings, _muted, t(lang, 'settings'), 'Language • Account • Sound • Help', () => widget.onGo(6, 'Settings'), last: true),
+          ]),
+        ),
+        const SizedBox(height: 14),
+        const Text('Not affiliated with OEC or HRD Korea. Check the latest OEC notice at jobs.oec.gov.pk.',
+            textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: _muted)),
+      ]),
+    );
+  }
+
+  Widget _stat(String value, String label) => Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.white70)),
+      ]));
+
+  Widget _quickAction(IconData icon, Color c, String label, VoidCallback onTap) => Expanded(child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Column(children: [
+          Container(
+            width: 60, height: 60,
+            decoration: BoxDecoration(color: Colors.white, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.08), blurRadius: 8, offset: const Offset(0, 3))]),
+            child: Icon(icon, color: c, size: 28),
+          ),
+          const SizedBox(height: 6),
+          Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _ink)),
+        ]),
+      ));
+
+  Widget _card({required List<Widget> children}) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20), boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 3))]),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
+      );
+
+  Widget _cardHead(String emoji, String title) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(children: [
+          Text(emoji, style: const TextStyle(fontSize: 20)),
+          const SizedBox(width: 6),
+          Expanded(child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: _ink))),
+        ]),
+      );
+
+  Widget _exploreRow(IconData icon, Color c, String title, String sub, VoidCallback onTap, {bool last = false}) => InkWell(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(border: last ? null : const Border(bottom: BorderSide(color: Color(0xFFEEF1F4)))),
+          child: Row(children: [
+            Container(width: 40, height: 40, decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(12)), child: Icon(icon, color: c, size: 22)),
             const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('EPS TOPIK Pro Pakistan', style: TextStyle(fontSize: 19, fontWeight: FontWeight.bold, color: Colors.white)),
-              const Text('Korea Pakka! 🇰🇷🇵🇰', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFFFE082))),
-              Text('${store.currentName} • ${store.isGuest ? 'Guest — on this phone only' : 'Account saved'}', style: const TextStyle(fontSize: 12, color: Colors.white70)),
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: _ink)),
+              Text(sub, style: const TextStyle(fontSize: 12, color: _muted)),
             ])),
+            const Icon(Icons.arrow_forward_ios, size: 15, color: _muted),
           ]),
-          const SizedBox(height: 14),
-          ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(value: (store.level / 5).clamp(0.0, 1.0), minHeight: 10, backgroundColor: Colors.white30, valueColor: const AlwaysStoppedAnimation(Color(0xFFFFCA28)))),
-          const SizedBox(height: 6),
-          Text('Level ${store.level} of 5  •  $words words learned  •  $days study days  •  $mocks mock tests', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 12),
-          SizedBox(width: double.infinity, child: ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFFF7043), minimumSize: const Size.fromHeight(54)),
-            onPressed: widget.onStart,
-            child: Text('▶  ${t(lang, 'startLearning')} — Lesson 1, Korean letters', style: const TextStyle(fontSize: 16, color: Colors.white, fontWeight: FontWeight.bold)),
-          )),
-        ]),
-      ),
-      const SizedBox(height: 14),
-      // FREE + FRESH — two compact cards side by side
-      Row(children: [
-        Expanded(child: _miniCard(Colors.green, '🎓 FREE', t(lang, 'freeTitle'), t(lang, 'notebookLine'))),
-        const SizedBox(width: 10),
-        Expanded(child: _miniCard(Colors.orange, '📖 Fresh syllabus', t(lang, 'fresh'), 'New HRD books, 2024 revised, in force 1 Aug 2025.')),
-      ]),
-      const SizedBox(height: 6),
-      Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFFFCA28), width: 2)),
-        child: Row(children: [
-          const Text('🎯', style: TextStyle(fontSize: 30)),
-          const SizedBox(width: 10),
-          Expanded(child: Text(t(lang, 'passing'), style: const TextStyle(fontWeight: FontWeight.bold))),
-        ]),
-      ),
-      const SizedBox(height: 16),
-      _sectionHead('🚀', 'Your learning path', navy),
-      GridView.count(
-        shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.35,
-        children: [
-          _gridCard(teal, '🎤', t(lang, 'tutor'), 'Ask in Pashto, Sindhi, Saraiki, Punjabi, Urdu, English', () => widget.onGo(4, 'Tutor')),
-          _gridCard(navy, '📚', t(lang, 'course'), 'Hangul + Units 1–60, new syllabus', () => widget.onGo(1, 'Learn')),
-          _gridCard(const Color(0xFF6A1B9A), '🎮', t(lang, 'games'), 'Listen & Tap, Match, Memory, Quiz', () => widget.onGo(5, 'Games')),
-          _gridCard(const Color(0xFFEF6C00), '🎙️', t(lang, 'speakTest'), 'Listen, repeat, speak — honest score', () => widget.onGo(2, 'Practice')),
-        ],
-      ),
-      const SizedBox(height: 16),
-      _sectionHead('🏆', 'Test-ready', const Color(0xFFC62828)),
-      _homeTile(context, '📝 Mock Test — Basic & Expert', '40 questions, 50 min, 100 points. Expert = real test level, merit 82.5.', () => widget.onGo(3, 'Mock')),
-      _homeTile(context, '🛡 ${t(lang, 'skillTest')}', 'Physical 30 + interview 30 + skills 40. Below 60% means out. Total 205.', () => widget.onGo(1, 'Learn')),
-      _homeTile(context, '🆘 ${t(lang, 'emergency')}', 'I am hurt • Please help me • Where is the toilet? — with sound.', () => widget.onGo(1, 'Learn')),
-      const SizedBox(height: 16),
-      _sectionHead('🌏', 'Life in Korea', teal),
-      _homeTile(context, '🏭 ${t(lang, 'lifeWork')}', 'Minimum wage 2026: 10,320 KRW/hour. Rights, safety, helpline 1350, 119.', () => widget.onGo(1, 'Learn')),
-      _homeTile(context, '📋 ${t(lang, 'docs')}', 'Passport, CNIC, medical, police character, OEC forms — tick each off.', () => widget.onGo(1, 'Learn')),
-      const SizedBox(height: 16),
-      _sectionHead('📅', '12-week self-study plan — 30 min a day', navy),
-      Card(child: ExpansionTile(
-        title: const Text('Weeks 1–12 — tap to open the plan', style: TextStyle(fontWeight: FontWeight.bold)),
-        children: selfStudyPlan.map((w) => ListTile(leading: const Icon(Icons.check_circle_outline, color: Color(0xFF00897B)), title: Text(w[0], style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(w[1]))).toList(),
-      )),
-      const SizedBox(height: 10),
-      const Text('Not affiliated with OEC or HRD Korea. Check the latest OEC notice at jobs.oec.gov.pk.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12, color: Colors.grey)),
-    ]);
-  }
-
-  Widget _sectionHead(String emoji, String title, Color c) => Padding(
-    padding: const EdgeInsets.only(bottom: 8),
-    child: Row(children: [Text(emoji, style: const TextStyle(fontSize: 20)), const SizedBox(width: 6), Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: c))]),
-  );
-
-  Widget _miniCard(Color c, String title, String line1, String line2) => Container(
-    padding: const EdgeInsets.all(12),
-    decoration: BoxDecoration(color: c.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(16), border: Border.all(color: c.withValues(alpha: 0.35))),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 15)),
-      const SizedBox(height: 4),
-      Text(line1, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-      Text(line2, style: const TextStyle(fontSize: 12)),
-    ]),
-  );
-
-  Widget _gridCard(Color c, String emoji, String title, String sub, VoidCallback onTap) => InkWell(
-    onTap: onTap,
-    borderRadius: BorderRadius.circular(16),
-    child: Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border(left: BorderSide(color: c, width: 5))),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(emoji, style: const TextStyle(fontSize: 26)),
-        const SizedBox(height: 4),
-        Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: c, fontSize: 14)),
-        Text(sub, style: const TextStyle(fontSize: 12)),
-      ]),
-    ),
-  );
-
-  Widget _homeTile(BuildContext context, String title, String sub, VoidCallback onTap) {
-    return Card(child: ListTile(title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)), subtitle: Text(sub), trailing: const Icon(Icons.arrow_forward_ios, size: 16), onTap: onTap));
-  }
+        ),
+      );
 }
 
 // ---------------- Learn ----------------
