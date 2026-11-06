@@ -63,8 +63,38 @@ class RootPage extends StatefulWidget {
 class _RootPageState extends State<RootPage> {
   int tab = 0;
   final List<String> trail = [];
+  // 3-path entry points (v1.3.0). LearnPage / MockPage read these ONCE in
+  // initState; changing the seed forces a fresh page (new ValueKey) so a
+  // path tap always lands on its real starting screen, never a stale one.
+  // 'basic' -> Hangul, 'mid' -> Unit 11, 'expert' -> Unit 31 / Expert mock.
+  String? learnStart;
+  int learnSeed = 0;
+  String mockDifficulty = 'basic';
+  int mockSeed = 0;
   String get lang => AppStore.I.lang;
   String tr(String k) => t(lang, k);
+
+  /// Choose a learning path. Sets the STARTING level only — it does NOT
+  /// mark any unit done and does NOT lock anything: level is a display /
+  /// Notebook-Time scale, not a gate. A Mid learner can still open Units
+  /// 0-10 any time, and a Basic learner can still try the Expert mock.
+  /// Mark-done (progress['done']) stays the only record of finished work,
+  /// so switching paths never wipes progress.
+  Future<void> choosePath(String path) async {
+    if (path == 'basic') {
+      await AppStore.I.setLevel(1);
+      setState(() { learnStart = 'basic'; learnSeed++; tab = 1; trail.add('Learn — Basic'); });
+    } else if (path == 'mid') {
+      await AppStore.I.setLevel(3);
+      setState(() { learnStart = 'mid'; learnSeed++; tab = 1; trail.add('Learn — Mid'); });
+    } else if (path == 'expert') {
+      await AppStore.I.setLevel(5);
+      setState(() { learnStart = 'expert'; learnSeed++; tab = 1; trail.add('Learn — Expert'); });
+    } else if (path == 'expert-mock') {
+      await AppStore.I.setLevel(5);
+      setState(() { mockDifficulty = 'expert'; mockSeed++; tab = 3; trail.add('Mock — Expert'); });
+    }
+  }
 
   void goTab(int i, String name) {
     setState(() {
@@ -87,10 +117,10 @@ class _RootPageState extends State<RootPage> {
   Widget build(BuildContext context) {
     if (AppStore.I.session == null) return AuthScreen(onDone: () => setState(() {}));
     final pages = [
-      HomePage(onGo: goTab, onStart: () => goTab(1, 'Learn')),
-      const LearnPage(),
+      HomePage(onGo: goTab, onStart: () => goTab(1, 'Learn'), onChoosePath: choosePath),
+      LearnPage(key: ValueKey('learn-$learnSeed'), start: learnStart),
       const PracticePage(),
-      const MockPage(),
+      MockPage(key: ValueKey('mock-$mockSeed'), initialDifficulty: mockDifficulty),
       const TutorPage(),
       const GamesPage(),
       const SettingsPage(),
@@ -284,7 +314,8 @@ class _AuthScreenState extends State<AuthScreen> {
 class HomePage extends StatefulWidget {
   final void Function(int, String) onGo;
   final VoidCallback onStart;
-  const HomePage({super.key, required this.onGo, required this.onStart});
+  final void Function(String) onChoosePath;
+  const HomePage({super.key, required this.onGo, required this.onStart, required this.onChoosePath});
   @override
   State<HomePage> createState() => _HomePageState();
 }
@@ -372,6 +403,51 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
           ]),
+        ),
+        const SizedBox(height: 20),
+        // CHOOSE YOUR PATH (v1.3.0) — the 2026 test is hard (pass 60/100,
+        // Pakistan merit 82.5/100), so Home divides the rush into 3
+        // starting points instead of one "Start Learning" for everyone.
+        // Each card is a real tap: it sets the starting level (see
+        // choosePath in RootPage) and opens the right first screen.
+        const Text('Choose your path', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: _ink)),
+        const SizedBox(height: 4),
+        const Text('The 2026 test is hard — pass 60/100, merit 82.5/100. Pick where YOU start. You can change path any time; nothing is locked and finished units stay finished.',
+            style: TextStyle(fontSize: 13, color: _muted)),
+        const SizedBox(height: 10),
+        _pathCard(
+          icon: '🟢', badge: 'BASIC', badgeColor: _green,
+          title: 'Basic — Start from zero',
+          desc: 'You know no Korean yet, or only a few words.',
+          includes: 'Hangul alphabet walk (21 vowels + 19 consonants) • Syllable / word builder • First words • Units 0–10 • Notebook Time',
+          focus: 'Focus: read + write Korean letters first, then first words.',
+          button: 'Start Basic — Hangul',
+          isCurrent: store.level == 1,
+          onTap: () => widget.onChoosePath('basic'),
+        ),
+        const SizedBox(height: 12),
+        _pathCard(
+          icon: '🟡', badge: 'MID', badgeColor: const Color(0xFFEF6C00),
+          title: 'Mid — I know some Korean',
+          desc: 'You can read Hangul and know some words. Skip the basics.',
+          includes: 'Start at Unit 11 • Units 11–30 daily life • Grammar • Vocabulary pages • Listening / reading practice',
+          focus: 'Focus: daily-life Korean, grammar and longer sentences.',
+          button: 'Start Mid — Unit 11',
+          isCurrent: store.level == 3,
+          onTap: () => widget.onChoosePath('mid'),
+        ),
+        const SizedBox(height: 12),
+        _pathCard(
+          icon: '🔴', badge: 'EXPERT / HARD', badgeColor: const Color(0xFFC62828),
+          title: 'Expert — Test-ready',
+          desc: 'You are aiming at the 82.5/100 merit, not just the 60 pass.',
+          includes: 'Units 31–60 workplace Korean • Safety signs, laws & insurance • Skill Test tasks • Expert Mock (40q / 50 min / 100) • Analytics',
+          focus: 'Focus: workplace Korean + hard mock tests until you beat 82.5.',
+          button: 'Start Expert — Unit 31',
+          isCurrent: store.level == 5,
+          onTap: () => widget.onChoosePath('expert'),
+          secondaryButton: 'Take Expert Mock →',
+          onSecondaryTap: () => widget.onChoosePath('expert-mock'),
         ),
         const SizedBox(height: 20),
         // QUICK ACTIONS — one row of 4 round actions, like CBD's
@@ -488,6 +564,61 @@ class _HomePageState extends State<HomePage> {
         ]),
       );
 
+  Widget _pathCard({required String icon, required String badge, required Color badgeColor, required String title, required String desc, required String includes, required String focus, required String button, required bool isCurrent, required VoidCallback onTap, String? secondaryButton, VoidCallback? onSecondaryTap}) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border(left: BorderSide(color: badgeColor, width: 6)),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 10, offset: const Offset(0, 3))],
+        ),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Text(icon, style: const TextStyle(fontSize: 22)),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(color: badgeColor, borderRadius: BorderRadius.circular(8)),
+              child: Text(badge, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+            const Spacer(),
+            if (isCurrent)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(color: const Color(0xFFE8F5E9), borderRadius: BorderRadius.circular(8)),
+                child: const Text('✓ Your path', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+              ),
+          ]),
+          const SizedBox(height: 8),
+          Text(title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _ink)),
+          const SizedBox(height: 2),
+          Text(desc, style: const TextStyle(fontSize: 14, color: _muted)),
+          const SizedBox(height: 8),
+          Text(includes, style: const TextStyle(fontSize: 13, color: _ink)),
+          const SizedBox(height: 6),
+          Text(focus, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _ink)),
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: badgeColor, minimumSize: const Size.fromHeight(48)),
+              onPressed: onTap,
+              child: Text(button, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white)),
+            ),
+          ),
+          if (secondaryButton != null) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: onSecondaryTap,
+                child: Text(secondaryButton, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: badgeColor)),
+              ),
+            ),
+          ],
+        ]),
+      );
+
   Widget _exploreRow(IconData icon, Color c, String title, String sub, VoidCallback onTap, {bool last = false}) => InkWell(
         onTap: onTap,
         child: Container(
@@ -508,13 +639,23 @@ class _HomePageState extends State<HomePage> {
 
 // ---------------- Learn ----------------
 class LearnPage extends StatefulWidget {
-  const LearnPage({super.key});
+  /// v1.3.0 path entry point: 'basic' -> Hangul, 'mid' -> Unit 11,
+  /// 'expert' -> Unit 31. Null = normal Learn tab (Hangul).
+  final String? start;
+  const LearnPage({super.key, this.start});
   @override
   State<LearnPage> createState() => _LearnPageState();
 }
 
 class _LearnPageState extends State<LearnPage> {
   String section = 'hangul';
+  @override
+  void initState() {
+    super.initState();
+    if (widget.start == 'mid') { section = 'course'; selectedUnit = 11; }
+    if (widget.start == 'expert') { section = 'course'; selectedUnit = 31; }
+    // 'basic' (and null) stay on Hangul — the alphabet walk is the start.
+  }
   int vowelIdx = 0, consIdx = 0, buildIdx = 0, buildStage = 0;
   int notebookStep = 0;
   int vocabPage = 0;
@@ -938,7 +1079,9 @@ class _PracticePageState extends State<PracticePage> {
 
 // ---------------- Mock Test ----------------
 class MockPage extends StatefulWidget {
-  const MockPage({super.key});
+  /// v1.3.0: Expert path can open Mock with 'expert' pre-selected.
+  final String initialDifficulty;
+  const MockPage({super.key, this.initialDifficulty = 'basic'});
   @override
   State<MockPage> createState() => _MockPageState();
 }
@@ -947,6 +1090,11 @@ class _MockPageState extends State<MockPage> {
   int qi = 0, listening = 0, reading = 0;
   bool started = false, finished = false;
   String difficulty = 'basic';
+  @override
+  void initState() {
+    super.initState();
+    difficulty = widget.initialDifficulty;
+  }
   int secondsLeft = 50 * 60;
 
   /// Shuffled options for question qi: correct + 3 wrong, position randomised.
