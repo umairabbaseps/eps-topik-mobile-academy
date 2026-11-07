@@ -8,6 +8,7 @@
 // prototype hash — replace with a server-side verifier at launch).
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 String simpleHash(String s) {
@@ -25,7 +26,37 @@ class AppStore {
   AppStore._();
   late SharedPreferences prefs;
 
-  Future<void> init() async => prefs = await SharedPreferences.getInstance();
+  /// Dark-mode notifier (v1.6.1 showcase Settings): EpsApp listens to it.
+  static final ValueNotifier<bool> darkModeNotifier = ValueNotifier<bool>(false);
+
+  Future<void> init() async {
+    prefs = await SharedPreferences.getInstance();
+    darkModeNotifier.value = darkMode;
+  }
+
+  // ---- showcase settings (v1.6.1) ----
+  bool get darkMode => prefs.getBool('darkMode') ?? false;
+  Future<void> setDarkMode(bool v) async {
+    await prefs.setBool('darkMode', v);
+    darkModeNotifier.value = v;
+  }
+
+  bool get notifications => prefs.getBool('notifications') ?? true;
+  Future<void> setNotifications(bool v) => prefs.setBool('notifications', v);
+
+  // ---- Lite / offline mode (v1.7.0) ----
+  // Honest label: lessons, words, mock banks and tutor bank are already
+  // stored on the phone (local-first) — Lite mode does not download
+  // anything extra. It turns off auto-play and shows the offline note.
+  bool get liteMode => prefs.getBool('liteMode') ?? false;
+  Future<void> setLiteMode(bool v) => prefs.setBool('liteMode', v);
+
+  // ---- Daily Quiz coins (v1.6.1) ----
+  int get coins => prefs.getInt('coins') ?? 0;
+  Future<void> addCoins(int n) => prefs.setInt('coins', coins + n);
+  String get _today => DateTime.now().toIso8601String().substring(0, 10);
+  bool get dailyQuizDoneToday => prefs.getString('dailyQuizDate') == _today;
+  Future<void> markDailyQuizDone() => prefs.setString('dailyQuizDate', _today);
 
   // ---- language: 'english' | 'roman' | 'script' ----
   String get lang => prefs.getString('lang') ?? 'roman';
@@ -173,7 +204,7 @@ class AppStore {
   }
 
   Future<void> addMock(int listening, int reading,
-      {String difficulty = 'basic', int secondsUsed = 0}) async {
+      {String difficulty = 'basic', int secondsUsed = 0, int totalQ = 40}) async {
     final p = progress;
     final mocks = List<Map<String, dynamic>>.from(
         (p['mocks'] as List? ?? []).map((e) => Map<String, dynamic>.from(e)));
@@ -183,6 +214,7 @@ class AppStore {
       'date': DateTime.now().toIso8601String(),
       'd': difficulty,
       'secs': secondsUsed,
+      'total': totalQ,
     });
     p['mocks'] = mocks;
     await saveProgress(p);
